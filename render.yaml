@@ -1,0 +1,20 @@
+# Render Blueprint: in the Render Dashboard choose New > Blueprint and pick this repo.
+# Render asks for GEMINI_API_KEY during setup (free at aistudio.google.com; never stored in this file).
+# To use Claude instead: set DM_PROVIDER to "anthropic" and add ANTHROPIC_API_KEY in the dashboard.
+services:
+  - type: web
+    name: unwritten-road
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SITE_PASSWORD
+        sync: false
+      - key: DM_PROVIDER
+        value: gemini
+      - key: NODE_VERSION
+        value: "20"
