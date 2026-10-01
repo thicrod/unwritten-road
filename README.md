@@ -126,6 +126,27 @@ ANTHROPIC_API_KEY=sk-ant-... npm start
   - **Class gear:** wizard hats, rogue hoods, paladin helms, druid leaf crowns, bard caps, war paint, holy symbols.
   - **Designing yours:** players choose skin or scales, hair style and color, beard, eyes and whether to show gear in the creator's Story step. Companions keep a stable look.
   - **Enemies** get type icons (beast, undead, dragon, fiend…).
+- **Rare encounters:** about 1 road encounter in 9 is special, and each happens once per campaign: 12 hand-written encounters.
+  - **Rare (gold):** a peddler of wonders, a forgotten god's shrine, a hero's cairn, a lost caravan, a field of ghosts.
+  - **Legendary (violet):** a wishing well, a messenger of light.
+  - **Ominous (red):** a cursed idol, a plague village, night thieves, a dragon's shadow, your own double.
+  - **Rewards:** rare magic items, permanent ability score increases, blessings, inspiration and big treasure.
+  - **Punishments:** curses (−2 to attacks) and disease (−2 to checks) until a temple cures them, lost gold or gear, and the villain's plans accelerating.
+  - The Journal counts how many you've found.
+- **Roll dice yourself** (on by default; Settings to turn off):
+  - **Your d20 rolls wait for you:** attacks, death saves and checks from events and traps show the die with "Tap to roll". The result is decided when you click.
+  - **Checks the DM asks for** (talking to NPCs, sneaking…) wait for the Roll button instead of rolling themselves.
+  - **In co-op** each player taps for their own hero's rolls on their own screen; everyone else sees the result.
+- **Battle map:** every fight shows a live battlefield drawn for the terrain (forest, cave, crypt, swamp, town…).
+  - Your party is on the left and enemies on the right, each in front and back lines, as portrait tokens with HP rings and condition badges.
+  - The active character glows, and a "Your turn" banner shows when it's yours.
+  - Tap an enemy token to target it. 🛡 marks foes your melee can't reach past their front line.
+  - Spell effects and damage play on the tokens, and tokens slide between lines when someone moves or is shoved.
+  - It can be hidden from the map itself or in Settings.
+- **Party size:**
+  - **Solo:** the creator's Party step offers "Just me" or 2–4 heroes. Fights scale to the party.
+  - **Co-op:** the lobby's "Fill empty seats with AI" option can be unticked to play with exactly the people who joined (e.g. 2 players, no AI).
+- **First-time tips:** a short tip the first time you see the story, combat, the map, dungeons and the party screen. Settings → "Show tips again" brings them back.
 - **Monster portraits:** every creature in the bestiary gets a drawn portrait by family.
   - **Families:** goblins and kobolds, skeletons, zombies and ghouls, ghosts, spiders, trolls, ogres, dragons and lizardfolk, oozes, demons, elementals, golems and mimics.
   - **Beast variants:** wolves, bears, rats, owlbears, minotaurs, boars and more.

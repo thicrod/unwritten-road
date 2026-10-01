@@ -214,8 +214,9 @@ function bossEncounter(c, theme, diff="hard", displayName, minLvl=1){
 function bestAt(c, skill){ return partyMembers(c).filter(m => m.hp > 0).sort((a,b) => skillMod(b, skill) - skillMod(a, skill))[0] || c.characters[c.activeCharId]; }
 async function partyCheck(skill, dc, o={}){
   const c = C(); const members = partyMembers(c).filter(m => m.hp > 0);
-  const isSkill = !!SKILLS[skill]; const modOf = m => isSkill ? skillMod(m, skill) : o.save ? saveMod(m, skill) : mods(m)[skill] || 0;
+  const isSkill = !!SKILLS[skill]; const modOf = m => (isSkill ? skillMod(m, skill) : o.save ? saveMod(m, skill) : mods(m)[skill] || 0) - (!o.save && hasCond(m, "diseased") ? 2 : 0);
   const label = isSkill ? `${skill} check` : o.save ? `${ABIL_NAME[skill]||skill} save` : `${ABIL_NAME[skill]||skill} check`;
+  if (manualDice() && !Coop.remoteCall && !window.Net?.isGuest() && S().settings.diceAnim !== "off") await rollPrompt({ label: o.group ? `Group ${label}${o.dc ? ` (DC ${dc})` : ""}` : `${label}${dc ? ` (DC ${dc})` : ""}`, sides: 20 });
   if (o.group){
     const rolls = members.map(m => { const r = rollD20({lucky: RACES[m.race].lucky}); const tot = r.kept + modOf(m); return {m, nat: r.kept, mod: modOf(m), tot, ok: r.kept === 20 || (r.kept !== 1 && tot >= dc)}; });
     const okN = rolls.filter(r => r.ok).length; const success = okN >= Math.ceil(rolls.length / 2);
@@ -237,6 +238,7 @@ function giveLoot(c, loot, notes, toId){
 function applyEffects(c, eff, notes){
   if (!eff) return null;
   const members = partyMembers(c).filter(m => !m.dead); const main = c.characters[c.activeCharId];
+  applyRareEffects(c, eff, notes, members, main);
   if (eff.xp){ const x = eff.xp * Math.max(1, partyLevel(c)); for (const m of members) gainXP(c, m, x, notes, "exploration", m.id !== main.id); }
   if (eff.gold){ const g = typeof eff.gold === "string" ? rollDice(eff.gold).total : eff.gold; const before = main.gold; main.gold = Math.max(0, main.gold + g); const dg = main.gold - before; if (dg) notes.push({kind: dg > 0 ? "loot" : "hurt", text:`${dg > 0 ? "+" : ""}${dg} gold`}); }
   if (eff.days){ advanceTime(c, eff.days); notes.push({kind:"hurt", text:`Lost ${eff.days} day${eff.days > 1 ? "s" : ""}`}); }
@@ -284,6 +286,7 @@ function advanceTime(c, days){
 // pick what (if anything) interrupts a journey
 function pickRoadEncounter(c, plan){
   const recent = c.eventsSeen || [];
+  const rare = rollRareEncounter(c); if (rare) return { kind: "event", ev: rare };
   const r = Math.random();
   const strangers = partyMembers(c).length < MAX_PARTY ? COMPANIONS.filter(t => !partyMembers(c).some(m => m.companion?.tpl === t.id) && !(c.formerCompanions||[]).some(f => c.characters[f.id]?.companion?.tpl === t.id) && !(c.fallen||[]).some(f => c.characters[f.id]?.companion?.tpl === t.id)) : [];
   if (r < 0.14 && strangers.length) return { kind:"event", ev: strangerEvent(c, pick(strangers)) };
@@ -315,7 +318,7 @@ async function beginTravel(toId){
     stopAt: enc ? 0.35 + Math.random() * 0.3 : null, stopLabel: enc ? (enc.kind === "ambush" ? "Movement in the brush…" : "Something on the road…") : null });
   const trip = `The party travels from ${plan.from.name} to ${to.name}: ${daysLabel(plan.days)} ${plan.onRoad ? "along the road" : plan.wild ? "cross-country" : "on trails"} through ${biomeWords(plan)}.`;
   if (enc?.kind === "event"){
-    store.camp(c => { c.pendingArrival = toId; c.event = { id: enc.ev.id, data: enc.ev.dynamic ? enc.ev : null, context: trip }; markTrail(c, plan.cells); });
+    store.camp(c => { c.pendingArrival = toId; c.event = { id: enc.ev.id, data: enc.ev.dynamic ? enc.ev : null, context: trip }; if (enc.ev.rare){ c.lastRareDay = c.time.day; c.raresSeen = [...(c.raresSeen || []), enc.ev.id]; } markTrail(c, plan.cells); });
     openModal({type:"event"}); return;
   }
   if (enc?.kind === "ambush"){

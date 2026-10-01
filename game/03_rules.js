@@ -373,7 +373,7 @@ const COND_INFO = {
   "poisoned":["bad","Disadvantage on attacks and ability checks."],"frightened":["bad","Disadvantage on attacks and checks."],"restrained":["bad","Attacks against you have advantage; your attacks have disadvantage."],
   "prone":["bad","Melee attacks against you have advantage; your attacks have disadvantage."],"blinded":["bad","Your attacks have disadvantage; attacks against you have advantage."],
   "paralyzed":["bad","You can't act; hits against you are critical."],"stunned":["bad","You can't act."],"charmed":["bad","You can't attack the charmer."],"exhausted":["bad","Disadvantage on ability checks."],
-  "unconscious":["bad","Dying: roll death saves."],"cursed":["bad","A curse lingers."],"diseased":["bad","You are sick."],"stable":["good","Stabilized at 0 HP."]
+  "unconscious":["bad","Dying: roll death saves."],"cursed":["bad","−2 to attack rolls until a temple lifts the curse."],"diseased":["bad","−2 to ability checks until cured at a temple."],"stable":["good","Stabilized at 0 HP."]
 };
 const condKind = n => (COND_INFO[n]||["bad"])[0];
 function addCond(ch, name, extra={}){ ch.conditions = (ch.conditions||[]).filter(c=>c.name!==name); ch.conditions.push({name, ...extra}); }

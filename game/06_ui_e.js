@@ -59,7 +59,7 @@ function OnlineModal({ m }){
 // ======================= CO-OP PLAY (host-side rules + shared UI) =======================
 const TURN_MS = 60000, VOTE_MS = 30000;
 const Coop = {
-  remoteCall: null,
+  remoteCall: null, remoteRoll: false,
   on(){ const N = window.Net; return !!N?.isOnline(); },
   active(){ const N = window.Net; return !!N?.isOnline() && N.room.players.filter(p => p.connected).length >= 2; },
   whoLabel(pid){ const N = window.Net; const c = C(); if (!N || !c) return null; if (pid === N.room?.hostId) return c.characters[c.activeCharId]?.name; const hero = Object.entries(N.room?.seats || {}).find(([, p]) => p === pid)?.[0]; return hero ? c.characters[hero]?.name : N.playerName(pid); },
@@ -145,7 +145,8 @@ const Coop = {
     if (it.type === "combat"){
       const allowed = ["pcAttack", "pcCast", "pcAbility", "pcBasic", "pcMove", "pcRunAway", "pcUseItem", "pcDeathSave", "pcCustom", "endPlayerTurn", "pcShove"];
       const cur = curCb(c); if (!allowed.includes(it.fn) || !c.combat || c.combat.status !== "active" || !cur || Net.controllerOf(c, cur) !== pid) return;
-      const f = Net.orig[it.fn] || window[it.fn]; if (typeof f === "function") f(...(Array.isArray(it.args) ? it.args.slice(0, 4) : []));
+      const f = Net.orig[it.fn] || window[it.fn];
+      if (typeof f === "function"){ this.remoteRoll = true; let r; try { r = f(...(Array.isArray(it.args) ? it.args.slice(0, 4) : [])); } finally { if (!(r && r.then)) this.remoteRoll = false; } if (r && r.then) r.finally(() => { this.remoteRoll = false; }); }
     } else if (it.type === "roll"){
       const pr = c.pendingRoll; if (!pr || !pr.who || Net.controllerOf(c, { kind: "pc", ref: pr.who, main: pr.who === c.activeCharId }) !== pid) return;
       doPendingRoll({ who: pr.who });
@@ -218,6 +219,7 @@ async function startFromLobby(){
   const main = buildCharacter(hostSeat.draft); const extra = [], seatMap = {}, locked = {};
   for (const x of L.seats){
     if (x === hostSeat) continue; let ch;
+    if (x.kind === "human" && !(x.pid && x.draft) && L.premise?.fillAI === false) continue;   // leave the seat empty: a smaller party
     if (x.kind === "human" && x.pid && x.draft){ try { ch = buildCharacter(x.draft); ch.companion = playerHeroBlock(ch, x.pid, N.playerName(x.pid)); seatMap[ch.id] = x.pid; } catch { ch = null; } }
     if (!ch){ ch = buildCompanion(COMPANIONS.find(t => t.id === x.tpl) || spare(), 1); if (x.kind === "ai" && x.pid) seatMap[ch.id] = x.pid; if (x.lock) locked[ch.id] = true; }
     extra.push(ch);
@@ -288,13 +290,14 @@ function LobbyView(){
         <div className="field"><label>Tone</label><${Seg} value=${P.tone} options=${["Heroic","Grim & dark","Mystery","Horror","Whimsical"].map(x=>[x,x])} onChange=${v=>setP({ tone: v })}/></div>
         <div className="field"><label>Setting</label><${Seg} value=${P.setting} options=${["Classic kingdoms","Frontier wilds","Haunted realm","Desert empire","Northern isles","Surprise me"].map(x=>[x,x])} onChange=${v=>setP({ setting: v })}/></div>
         <div className="field"><label>Difficulty</label><${Seg} value=${P.difficulty} options=${[["story","Story"],["standard","Standard"],["deadly","Deadly"]]} onChange=${v=>setP({ difficulty: v })}/></div>
+        <label className="row" style=${{gap:6, fontSize:13.5, margin:"4px 0 10px"}}><input type="checkbox" checked=${P.fillAI !== false} onChange=${e=>setP({ fillAI: e.target.checked })}/> Fill human seats nobody takes with AI companions (untick to play with just the people who joined)</label>
         <div className="field"><label>Length</label><${Seg} value=${P.mode || "campaign"} options=${[["campaign","Full campaign"],["quick","Quick adventure (one evening)"]]} onChange=${v=>setP({ mode: v })}/>
           <div className="faint" style=${{fontSize:12.5, marginTop:4}}>${P.mode === "quick" ? "About 90 minutes. Heroes start at level 3." : "A long campaign in three acts."}</div></div>`
       : html`<p style=${{margin:0}}>${P.name ? html`<b>${P.name}</b> · ` : ""}${P.mode === "quick" ? "Quick adventure (one evening, heroes start at level 3) · " : ""}${P.tone} · ${P.setting} · ${cap(P.difficulty || "standard")}</p>`}
     </section>
     <section className="parch panel"><h3 className="panel-title">Players</h3>
       <div className="row wrap" style=${{gap:6}}>${on.players.map(p => html`<span key=${p.id} className="chip"><span className=${"odot " + (p.connected ? "ok" : "warn")}></span> ${p.name}${p.host ? " 👑" : ""}</span>`)}</div></section>
-    ${host ? html`<div className="lobby-start"><span className="faint grow">${!hostReady ? "Create your hero to start." : openHuman ? `${openHuman} human seat${openHuman > 1 ? "s aren't" : " isn't"} filled yet; the AI will play ${openHuman > 1 ? "them" : "it"} if you start now.` : "Everyone's ready."}</span>
+    ${host ? html`<div className="lobby-start"><span className="faint grow">${!hostReady ? "Create your hero to start." : openHuman ? `${openHuman} human seat${openHuman > 1 ? "s aren't" : " isn't"} filled yet; ${P.fillAI === false ? `the party will start without ${openHuman > 1 ? "them" : "it"}.` : `the AI will play ${openHuman > 1 ? "them" : "it"} if you start now.`}` : "Everyone's ready."}</span>
         <button className="btn primary lg" disabled=${!hostReady || !!s.busy} onClick=${startFromLobby}>Start the adventure</button></div>`
       : html`<div className="lobby-start"><span className="candle sm"></span><span className="faint">${mySeat ? (mySeat.kind === "ai" || mySeat.draft ? "You're ready. Waiting for the host to start…" : "Create your hero, then wait for the host to start.") : "Pick a seat above."}</span></div>`}
   </div>`;

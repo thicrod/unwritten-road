@@ -390,6 +390,7 @@ function resolveAttack(c, att, tgt, a, o={}){
   if (ch && am.why.includes("luck")) { useRes(ch,"luck"); cm.pt.luck = false; }
   const r = rollD20({adv: am.adv, dis: am.dis, lucky: ch ? RACES[ch.race].lucky : false});
   let toHit = a.toHit; const extra = [];
+  if (ch && hasCond(ch, "cursed")) toHit -= 2;
   if (ch && hasCond(ch,"blessed")){ const b = d(4); toHit += b; extra.push(`bless ${b}`); }
   if (!ch && hasC(c, att, "blessed")) toHit += d(4);
   if (ch && hasCond(ch,"sacred-weapon") && !a.spell) toHit += Math.max(1, mods(ch).CHA);
@@ -899,8 +900,13 @@ function doDeathSave(c, cb){
 // ---- player-facing wrappers (animate, then commit) ----
 async function playerAct(fn){
   const cur = C(); if (!cur?.combat || cur.combat.status !== "active" || !isPlayerTurn(cur)) return;
-  const c = structuredClone(cur); const fx = fn(c) || {};
+  let c = structuredClone(cur); let fx = fn(c) || {};
   if (fx.error){ toast(fx.error, "bad"); return; }
+  if (fx.overlay && manualDice() && !Coop.remoteRoll){
+    await rollPrompt({ label: fx.overlay.label, sides: 20 });
+    const now = C();
+    if (now !== cur){ if (!now?.combat || now.combat.status !== "active" || !isPlayerTurn(now)) return; c = structuredClone(now); fx = fn(c) || {}; if (fx.error){ toast(fx.error, "bad"); return; } }
+  }
   clog(c, "sys", "");
   if (fx.overlay && S().settings.diceAnim !== "off") await showRoll({...fx.overlay, quick: true});
   c.updatedAt = Date.now(); store.set({campaign: c}); scheduleSave();
@@ -916,6 +922,7 @@ function pcMove(){ return playerAct(c => doMove(c)); }
 function pcRunAway(){ return playerAct(c => doRunAway(c)); }
 function pcUseItem(itemId, targetId){ const it = invItem(actorCh(C()), itemId); if (it && !["potion","scroll"].includes(it.type)) return pcCustom(`${actorCh(C()).name} uses the ${it.name}.`); return playerAct(c => doUseItem(c, itemId, targetId)); }
 async function pcDeathSave(){
+  if (manualDice() && !Coop.remoteRoll && isPlayerTurn(C())) await rollPrompt({ label: `${actorCh(C())?.name || "You"}: death saving throw`, sides: 20 });
   const c = C(); const cb = actorCb(c); const ch = cbChar(c, cb); if (!c?.combat || !ch || ch.hp > 0 || ch.dead) return;
   const cl = structuredClone(c); const nat = doDeathSave(cl, actorCb(cl));
   await showRoll({label:`${ch.name}: death saving throw`, dice:[{sides:20, values:[nat], kept:nat}], mod:0, total:nat, dc:10, success: nat>=10, crit: nat===20, fumble: nat===1});

@@ -474,7 +474,7 @@ async function runDM(kind, payload={}){
   if (lastSys?.kind==="sys" && lastSys.notes.some(n=>n.text==="Level up available!")) toast("Level up available! Open your character sheet.", "gold");
   const rollFor = c.pendingRoll && (c.pendingRoll.who || c.activeCharId);
   const othersRoll = rollFor && window.Net?.isOnline() && Net.controllerOf(c, {kind:"pc", ref: rollFor, main: rollFor === c.activeCharId}) !== Net.me.id && !c.pendingRoll.group;
-  if (c.pendingRoll && S().settings.autoRoll && !post?.combat && !othersRoll){ await sleep(700); if (C()?.pendingRoll) doPendingRoll(); }
+  if (c.pendingRoll && S().settings.autoRoll && !manualDice() && !post?.combat && !othersRoll){ await sleep(700); if (C()?.pendingRoll) doPendingRoll(); }
   saveNow();
   maybeSummarize();
 }
@@ -492,6 +492,7 @@ function checkModifiers(ch, pr){
   let mod = pr.kind === "save" ? saveMod(ch, pr.ability) : pr.kind === "skill" ? skillMod(ch, pr.skill) : (mods(ch)[pr.ability] + (ch.cls==="Bard"&&ch.level>=2 ? Math.floor(profBonus(ch.level)/2) : 0));
   let adv = pr.adv === "advantage", dis = pr.adv === "disadvantage"; const why = []; const extra = [];
   const isCheck = pr.kind !== "save";
+  if (isCheck && hasCond(ch, "diseased")){ mod -= 2; why.push("diseased"); }
   if (isCheck && (hasCond(ch,"poisoned") || hasCond(ch,"frightened") || hasCond(ch,"exhausted"))){ dis = true; why.push("condition"); }
   if (hasCond(ch,"raging") && pr.ability === "STR"){ adv = true; why.push("rage"); }
   if (pr.kind === "save" && ch.race === "Gnome" && ["INT","WIS","CHA"].includes(pr.ability)){ adv = true; why.push("gnome cunning"); }
@@ -540,6 +541,9 @@ function showRoll(o){
   Sfx.play("dice"); if (o.success != null) setTimeout(() => Sfx.play(o.crit || o.success ? "success" : "fail"), ms * (quick ? 0.45 : 0.55));
   return new Promise(res => { overlayResolve = res; store.set({ overlay: {...o, quick, id: uid("o")} }); setTimeout(()=>{ store.set({overlay:null}); overlayResolve = null; res(); }, ms); });
 }
+// "Roll dice yourself": the die waits for the player's tap (the result is decided when they click)
+const manualDice = () => S().settings.manualDice !== false;
+function rollPrompt(o){ return new Promise(res => { overlayResolve = res; store.set({ overlay: { ...o, prompt: true, id: uid("o") } }); }); }
 function dismissOverlay(){ if (overlayResolve){ const r = overlayResolve; overlayResolve = null; store.set({overlay:null}); r(); } }
 
 // ---- New campaign -----------------------------------------------------------------

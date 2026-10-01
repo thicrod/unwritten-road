@@ -188,7 +188,7 @@ function Game(){
       <button className="chip hp" onClick=${()=>store.set({asideOpen:true})} aria-label="Open party status and dice">${ch.hp}/${maxHp(ch)} HP</button>
       <button className="btn ghost sm" onClick=${()=>store.set({asideOpen:true})} aria-label="Dice and status"><${Icon} n="d20" size=${18}/></button>
     </header>
-    <main className="main">${window.Net && html`<${SpectatorBanner}/>`}${window.Net && html`<${VoteBar}/>`}${view}</main>
+    <main className="main">${window.Net && html`<${SpectatorBanner}/>`}${window.Net && html`<${VoteBar}/>`}${coachFor(s.tab, c)}${view}</main>
     ${window.Net && html`<${ChatPanel}/>`}
     <${Aside}/>
     ${s.asideOpen && html`<div className="scrim" onClick=${()=>store.set({asideOpen:false})}></div>`}

@@ -55,7 +55,7 @@ function hitPreview(c, me, tgt, a){
     const cc = {...c, combat: structuredClone(c.combat), characters: structuredClone(c.characters)};
     const att = cc.combat.cbt[me.id], t = cc.combat.cbt[tgt.id]; if (!att || !t) return null;
     const am = attackMods(cc, att, t, a); const ch = cbChar(cc, att);
-    let p = pHit(a.toHit + (ch && hasCond(ch, "blessed") ? 2.5 : 0), acOf(cc, t) + coverBonus(cc, att, t, a));
+    let p = pHit(a.toHit + (ch && hasCond(ch, "blessed") ? 2.5 : 0) - (ch && hasCond(ch, "cursed") ? 2 : 0), acOf(cc, t) + coverBonus(cc, att, t, a));
     const adv = am.adv && !am.dis, dis = am.dis && !am.adv;
     if (adv) p = 1 - (1 - p) ** 2; else if (dis) p = p * p;
     return { p, adv, dis };
@@ -132,6 +132,7 @@ function CombatView(){
     <${BossIntro} cm=${cm}/>
     ${cm.objective && html`<div className=${"objective " + cm.objective.status}><span className="obj-ico">🎯</span><b>${cm.objective.text}</b><span className="obj-prog">${objectiveProgress(c)}</span></div>`}
     ${cm.reinforce && !cm.reinforce.done && cm.round >= cm.reinforce.round - 1 && html`<div className="objective warn"><span className="obj-ico">⚠</span><span>You hear more footsteps approaching…</span></div>`}
+    <${Battlefield} c=${c} cm=${cm} sel=${sel} ally=${ally} cur=${cur} myTurn=${myTurn} onFoe=${pickFoe} onAlly=${id => setUI({ally: ally === id ? null : id})}/>
     <div className="combat-body">
       <div className="combat-col scroll" ref=${fieldRef}>
         <div className="side-block foes-side"><div className="side-label">Enemies</div>${lines(foes, e => html`<${Foe} key=${e.id} e=${e}/>`)}</div>
@@ -303,7 +304,7 @@ function Journal(){
         return html`<div key=${n} className=${"act-step" + (done ? " done" : cur ? " cur" : "")}><span className="act-n">${done ? "✓" : i + 1}</span><div><b>${ACTS[n]}</b><div className="faint" style=${{fontSize:12.5}}>${n === 1 ? `Clues ${Math.min(st.clues, st.need)}/${st.need}` : n === 2 ? (st.lt ? `${st.lt.name} at ${c.locations[st.lt.loc]?.name || "?"}` : "Not yet revealed") : (st.act >= 3 ? (villainLair(c)?.name || "The lair") : "Not yet revealed")}</div></div></div>`; })}</div>
       ${(c.story.log || []).length > 0 && html`<ul className="clue-log">${c.story.log.slice().reverse().map((x, i) => html`<li key=${i}><span className="faint">Day ${x.day}</span> ${x.text}</li>`)}</ul>`}
       <p className="faint" style=${{fontSize:12.5, margin:"6px 0 0"}}>${c.story.act === 1 ? "Clues come from tavern rumors, finished bounties, strange rooms in dungeons, defeated bosses and what you discover in the story." : c.story.act === 2 ? "Each act you finish also sets the villain's plans back." : "Make sure you're strong enough before you storm the lair."}</p></div>`}
-    <div className="parch panel"><h3 className="panel-title">Your legend so far</h3><p style=${{margin:0}}><b>${deedsTitle(c)[0].replace(/^the /,"The ")}</b>: ${deedsTitle(c)[1]}</p></div>
+    <div className="parch panel"><h3 className="panel-title">Your legend so far</h3>${(c.raresSeen || []).length ? html`<p className="faint" style=${{margin:"0 0 6px"}}>Rare encounters found: ${(c.raresSeen || []).length} of ${RARE_EVENTS.length}</p>` : null}<p style=${{margin:0}}><b>${deedsTitle(c)[0].replace(/^the /,"The ")}</b>: ${deedsTitle(c)[1]}</p></div>
     ${Object.keys(c.reputation||{}).length > 0 && html`<div className="parch panel"><h3 className="panel-title">Reputation</h3>${Object.entries(c.reputation).map(([k,v])=>html`<div key=${k} className="res-row"><span>${k}</span><span className=${"chip " + (v>=20?"good":v<=-20?"hp":"")}>${v>0?"+":""}${v}</span></div>`)}</div>`}
     <h2 className="sec">People</h2>
     <div className="npc-grid">${npcs.length ? npcs.map(n=>html`<div key=${n.id} className="npc parch">
@@ -361,7 +362,8 @@ function HelpModal(){
     ["Travel", "road", "Open the Map, pick a place and press Travel. Journeys take days and can be interrupted by events, strangers or ambushes. Each dangerous place shows a recommended level; the villain's lair is level 5+, so get stronger first."],
     ["Towns", "tavern", "Use the buttons under the location name: rest at the tavern (full heal), hear rumors, recruit companions, shop at the market or smithy, heal or raise the dead at the temple, and take bounties from the notice board."],
     ["Your party", "user", "Up to three companions travel with you. They fight on their own, level up automatically and react to your choices (watch their approval). On the Party screen you can set their tactics, swap front and back lines, take manual control, and equip gear upgrades."],
-    ["Combat", "swords", "Everyone takes turns in initiative order. The front line protects the back line: melee attackers must get through it first, and the back line gets cover (+2 AC) against ranged attacks. Gang up on a foe in melee for advantage (flanking), shove enemies out of their front line, and aim area spells at a whole line. Some fights have objectives (hold out, protect someone, stop a ritual), enemies may flee or surrender, and reinforcements can arrive. The percentage on each attack is your chance to hit. On desktop, press 1-9 to act, T to switch target and E to end your turn."],
+    ["Rolling dice", "d20", "When the outcome is uncertain, you roll. Attacks, saves and checks show a die: tap it (or press Space) to throw it. When the Dungeon Master asks for a check, press Roll. You can switch to automatic rolling in Settings."],
+    ["Combat", "swords", "The battle map at the top shows everyone: your party on the left, enemies on the right, each in a front and a back line. Tap an enemy to target it. Everyone takes turns in initiative order. The front line protects the back line: melee attackers must get through it first, and the back line gets cover (+2 AC) against ranged attacks. Gang up on a foe in melee for advantage (flanking), shove enemies out of their front line, and aim area spells at a whole line. Some fights have objectives (hold out, protect someone, stop a ritual), enemies may flee or surrender, and reinforcements can arrive. The percentage on each attack is your chance to hit. On desktop, press 1-9 to act, T to switch target and E to end your turn."],
     ["Music and portraits", "user", "Turn on ambient music in Settings: it follows the scene, from towns and wilds to dungeons and boss fights. Design your hero's portrait in the creator's Story step (skin, hair, beard, eyes, class gear)."],
     ["Main story", "quest", "Campaigns follow three acts: gather clues about the villain (from rumors, finished bounties, strange rooms and your discoveries), defeat their lieutenant, then storm the lair. Each act you finish sets the villain back. Quick adventures are one-evening stories: heroes start at level 3 and the path leads straight to the lair."],
     ["Dungeons", "dungeon", "Explore room by room on the dungeon map. Search rooms for secret doors, beware of traps and chests that bite, and find the boss in the deepest chamber. You can leave from any safe room."],
@@ -385,13 +387,16 @@ function SettingsModal(){
   const s = useStore(); const st = s.settings; const set = p => { store.set({settings:{...S().settings, ...p}}); saveSettings(); };
   const c = s.campaign;
   const Row = ({l, d, children}) => html`<div className="set-row"><div className="grow"><div className="sl">${l}</div>${d && html`<div className="faint" style=${{fontSize:12.5}}>${d}</div>`}</div>${children}</div>`;
-  const Tog = ({k}) => html`<label className="switch"><input type="checkbox" checked=${!!st[k]} onChange=${e=>set({[k]: e.target.checked})}/><span></span></label>`;
+  const Tog = ({k, def}) => html`<label className="switch"><input type="checkbox" checked=${!!(st[k] ?? def)} onChange=${e=>set({[k]: e.target.checked})}/><span></span></label>`;
   return html`<${Modal} title="Settings" onClose=${closeModal}>
     <h3 className="panel-title">Dungeon Master</h3>
     <${Row} l="Storyteller depth" d="Deeper models write richer scenes but respond more slowly."><${Seg} value=${st.tier} options=${[["quick","Fast"],["default","Balanced"],["complex","Deep"]]} onChange=${v=>set({tier:v})}/><//>
     <${Row} l="Narration length" d="How much the Dungeon Master writes per scene."><${Seg} value=${st.narration || "medium"} options=${[["short","Short"],["medium","Medium"],["long","Long"]]} onChange=${v=>set({narration:v})}/><//>
     <${Row} l="Story language" d="The Dungeon Master narrates in this language (menus stay in English). In co-op, the host's choice applies."><${Seg} value=${st.dmLanguage || "en"} options=${[["en","English"],["pt","Português"],["es","Español"]]} onChange=${v=>set({dmLanguage:v})}/><//>
-    <${Row} l="Auto-roll checks" d="Roll requested checks for you. Turn off to pick who rolls and click Roll yourself."><${Tog} k="autoRoll"/><//>
+    <${Row} l="Roll dice yourself" d="Tap to throw the die for your attacks, checks and saves. Turn off to have dice roll automatically."><${Tog} k="manualDice" def=${true}/><//>
+    ${st.manualDice === false && html`<${Row} l="Auto-roll checks" d="Roll requested checks for you. Turn off to pick who rolls and click Roll yourself."><${Tog} k="autoRoll"/><//>`}
+    <${Row} l="Battle map" d="A live map of every fight: who stands where, whose turn it is, and who you can reach."><${Tog} k="battleMap" def=${true}/><//>
+    <${Row} l="Tips for new players" d="Short tips the first time you see each screen."><button className="btn sm" onClick=${()=>{ set({tipsSeen:{}, tipsOff:false}); toast("Tips will show again."); }}>Show tips again</button><//>
     <${Row} l="Smart enemy tactics" d=${window.__WEB__ ? "The DM plans enemy moves each round. Uses one extra AI request per round, so on Gemini's free tier it spends the daily quota faster." : "The DM plans enemy moves each round (uses a little extra Claude usage)."}><${Tog} k="aiTactics"/><//>
     <${Row} l="Show hints" d="Suggest a few ideas after each scene."><${Tog} k="hints"/><//>
     ${window.__WEB__ && html`<${ApiKeyRow}/>`}
@@ -505,9 +510,11 @@ function ShopModal(){
 }
 function EventModal(){
   const c = C(); const ev = currentEvent(c); if (!ev){ setTimeout(() => { if (S().modal?.type === "event") closeModal(); }, 0); return null; }
-  const vote = c.coop?.vote?.kind === "event" ? c.coop.vote : null; const votesFor = i => vote ? Object.entries(vote.votes).filter(([, o]) => o === String(i)).map(([p]) => Net.playerName(p)) : [];
+  const vote = c.coop?.vote?.kind === "event" ? c.coop.vote : null;
+  useEffect(() => { if (ev.rare) Sfx.play(ev.rare === "ominous" ? "alert" : "levelup"); }, [ev.id]); const votesFor = i => vote ? Object.entries(vote.votes).filter(([, o]) => o === String(i)).map(([p]) => Net.playerName(p)) : [];
   const main = PC();
   return html`<${Modal} title=${ev.title} onClose=${null}>
+    ${ev.rare && html`<div className=${"rare-banner " + ev.rare}>${ev.rare === "legendary" ? "✦ Legendary encounter ✦" : ev.rare === "ominous" ? "☠ Ominous encounter" : "✦ Rare encounter"}<span>${ev.rare === "ominous" ? "Choose carefully: this could cost you." : "Fortune favors the bold… sometimes."}</span></div>`}
     ${c.event.context && html`<p className="faint" style=${{marginTop:0}}>${c.event.context}</p>`}
     <p className="event-text">${ev.text}</p>
     ${Coop.active() && html`<p className="faint" style=${{marginTop:0}}>Everyone votes. Majority wins; ties go to whoever voted first.</p>`}

@@ -167,7 +167,7 @@ export function attachRooms(httpServer) {
         return next;
       });
       if (premise && typeof premise === "object") L.premise = { name: clean(premise.name, 60), tone: clean(premise.tone, 30) || "Heroic", setting: clean(premise.setting, 40) || "Classic kingdoms",
-        difficulty: ["story", "standard", "deadly"].includes(premise.difficulty) ? premise.difficulty : "standard", mode: premise.mode === "quick" ? "quick" : "campaign", custom: clean(premise.custom, 500) };
+        difficulty: ["story", "standard", "deadly"].includes(premise.difficulty) ? premise.difficulty : "standard", mode: premise.mode === "quick" ? "quick" : "campaign", fillAI: premise.fillAI !== false, custom: clean(premise.custom, 500) };
       update(room);
     });
     socket.on("lobby:pick", ({ sid, mode } = {}, ack) => {

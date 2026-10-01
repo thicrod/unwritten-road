@@ -61,7 +61,14 @@ function Toasts(){ const s = useStore(); return html`<div className="toasts" ari
 
 // ---------- Dice overlay ----------
 function DiceOverlay(){
-  const s = useStore(); const o = s.overlay; if (!o) return null;
+  const s = useStore(); const o = s.overlay;
+  useEffect(() => { if (!o?.prompt) return; const k = e => { if (e.key === " " || e.key === "Enter"){ e.preventDefault(); dismissOverlay(); } }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [o?.id]);
+  if (!o) return null;
+  if (o.prompt) return html`<div className="overlay prompt" onClick=${dismissOverlay} key=${o.id}>
+    <div className="stage"><div className="label">${o.label}</div>
+      <div className="big-dice"><div className="prompt-die"><${DieFace} sides=${o.sides || 20} value="?" rolling=${false}/></div></div>
+      <button className="btn primary lg roll-now" onClick=${e => { e.stopPropagation(); dismissOverlay(); }} autoFocus>🎲 Tap to roll</button>
+      <div className="faint" style=${{fontSize:12.5, marginTop:6}}>or press Space</div></div></div>`;
   const dice = o.dice || [];
   const verdict = o.success == null ? null : o.crit ? "Critical!" : o.fumble ? "Fumble!" : o.success ? "Success" : "Failure";
   const vcls = o.crit ? "crit" : o.success ? "ok" : "no";
@@ -256,14 +263,17 @@ function Creator(){
         <div className="field"><label htmlFor="bs">Backstory hooks (optional)</label><textarea id="bs" className="input" maxLength=${800} rows=${4} value=${dr.backstory} placeholder="What do you want, what haunts you, who would you die for? The DM will weave this into the story." onInput=${e=>up({backstory:e.target.value})}></textarea></div>`;
       }
       case "Party": {
-        const togR = id => up(d => ({recruits: d.recruits.includes(id) ? d.recruits.filter(x => x !== id) : d.recruits.length < 3 ? [...d.recruits, id] : d.recruits}));
+        const size = dr.partySize || Math.min(4, dr.recruits.length + 1), cap0 = size - 1;
+        const setSize = n => up(d => ({ partySize: n, recruits: d.recruits.slice(0, n - 1) }));
+        const togR = id => up(d => ({recruits: d.recruits.includes(id) ? d.recruits.filter(x => x !== id) : d.recruits.length < cap0 ? [...d.recruits, id] : d.recruits}));
         const roles = {tank:0, striker:0, support:0, controller:0}; for (const id of dr.recruits){ const t = COMPANIONS.find(x=>x.id===id); if (t) roles[t.role]++; }
         return html`
-        <div className="parch detail"><h3>Your fellowship <span className="chip">${dr.recruits.length}/3</span></h3>
-          <p>Choose up to three companions who already travel with you, or start alone and recruit them at taverns along the way. Each has their own class, personality and opinions, and reacts to your choices.</p>
+        <div className="parch detail"><h3>Your fellowship ${cap0 > 0 ? html`<span className="chip">${dr.recruits.length}/${cap0}</span>` : null}</h3>
+          <div className="field"><label>Party size</label><${Seg} value=${String(size)} options=${[["1","Just me"],["2","2 heroes"],["3","3 heroes"],["4","4 heroes"]]} onChange=${v=>setSize(+v)}/></div>
+          <p>${cap0 > 0 ? `Choose ${cap0 === 1 ? "the companion" : `up to ${cap0} companions`} who already travel with you. Each has their own class, personality and opinions, and reacts to your choices. You can recruit more at taverns later (up to 4 heroes).` : "You set out alone. Fights are scaled to your party size, so solo play works, but it's harder: the Story difficulty is a good fit. You can still recruit companions at taverns along the way."}</p>
           <p className="muted" style=${{marginBottom:0}}>${dr.recruits.length ? `Party roles: ${Object.entries(roles).filter(([,n])=>n).map(([r,n])=>`${n} ${r}`).join(", ")}${!roles.support && dr.cls !== "Cleric" && dr.cls !== "Druid" && dr.cls !== "Bard" ? ". Consider a healer (support)." : "."}` : "A balanced party usually has a front-liner, a healer and some firepower."}</p></div>
-        <div className="pick-grid">${COMPANIONS.filter(t => t.cls !== dr.cls || true).map(t => html`<button key=${t.id} className=${"pick" + (dr.recruits.includes(t.id) ? " on" : "")} onClick=${()=>togR(t.id)} disabled=${!dr.recruits.includes(t.id) && dr.recruits.length >= 3}>
-          <span className="t"><${Portrait} ch=${{tpl: t.id, race: t.race, cls: t.cls, name: t.name, dragonType: t.dragon}} size=${34}/>${t.name}</span><span className="k">${t.race} ${t.cls} · ${t.role}</span><span className="d">${t.personality}</span></button>`)}</div>`;
+        ${cap0 > 0 && html`<div className="pick-grid">${COMPANIONS.filter(t => t.cls !== dr.cls || true).map(t => html`<button key=${t.id} className=${"pick" + (dr.recruits.includes(t.id) ? " on" : "")} onClick=${()=>togR(t.id)} disabled=${!dr.recruits.includes(t.id) && dr.recruits.length >= cap0}>
+          <span className="t"><${Portrait} ch=${{tpl: t.id, race: t.race, cls: t.cls, name: t.name, dragonType: t.dragon}} size=${34}/>${t.name}</span><span className="k">${t.race} ${t.cls} · ${t.role}</span><span className="d">${t.personality}</span></button>`)}</div>`}`;
       }
       case "Campaign": {
         const P = dr.premise; const setP = patch => up(d => ({premise:{...d.premise, ...patch}}));

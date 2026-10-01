@@ -43,11 +43,14 @@
       // A guest's own turn, roll or typed action is sent to the host, who checks it and runs it.
       for (const name of ["pcAttack", "pcCast", "pcAbility", "pcBasic", "pcMove", "pcRunAway", "pcUseItem", "pcDeathSave", "pcCustom", "endPlayerTurn", "pcShove"]) {
         const f = window[name]; if (typeof f !== "function") continue; this.orig[name] = f;
-        window[name] = function (...a) {
+        window[name] = async function (...a) {
           if (!Net.isGuest()) return f.apply(this, a);
           // buttons pass click events straight in (onClick={endPlayerTurn}); send only plain data
           const args = a.filter(x => !(x && typeof x === "object" && ("nativeEvent" in x || x instanceof Event)));
           let safe = []; try { safe = JSON.parse(JSON.stringify(args)); } catch {}
+          // "Roll dice yourself": a guest throws their own die before the host resolves the action
+          const sp = name === "pcCast" ? SPELL[safe[0]] : null;
+          if (manualDice() && (name === "pcAttack" || name === "pcShove" || name === "pcDeathSave" || sp?.m?.k === "atk")) await rollPrompt({ label: name === "pcDeathSave" ? "Death saving throw" : name === "pcShove" ? "Athletics contest" : "Attack roll", sides: 20 });
           Net.intent({ type: "combat", fn: name, args: safe });
         };
       }
