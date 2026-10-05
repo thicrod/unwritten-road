@@ -17,6 +17,13 @@ function allowCreate(ip) { const now = Date.now(); const list = (createLog.get(i
 export function roomStats() { let players = 0, online = 0; for (const r of rooms.values()) for (const p of r.players.values()) { players++; if (p.socketId) online++; } return { rooms: rooms.size, players, online }; }
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const rooms = new Map();
+let ioRef = null;
+// DM voice: only the room's host (verified by player id + token) can make the room play a clip.
+export function voiceToRoom(code, pid, token, payload) {
+  const room = rooms.get(String(code || "").toUpperCase()); const p = room?.players.get(pid);
+  if (!ioRef || !room || room.hostId !== pid || !p || p.token !== token) return false;
+  ioRef.to(room.code).emit("voice:play", payload); return true;
+}
 
 const newCode = () => { let c; do { c = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join(""); } while (rooms.has(c)); return c; };
 const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, n);
@@ -36,6 +43,7 @@ function freeLobbySeat(room, pid) {
 
 export function attachRooms(httpServer) {
   const io = new Server(httpServer, { maxHttpBufferSize: 3e6, pingInterval: 20000, pingTimeout: 25000 });
+  ioRef = io;
   const update = (room) => io.to(room.code).emit("room:update", summary(room));
   const socketOf = (room, pid) => { const p = room.players.get(pid); return p?.socketId ? io.sockets.sockets.get(p.socketId) : null; };
 

@@ -114,10 +114,11 @@ function Home(){
       <button className="menu-card slab" onClick=${()=>openModal({type:"campaigns"})}><${Icon} n="book"/><div><h3>Campaigns</h3><p>${s.index.length ? `${s.index.length} saved ${s.index.length===1?"campaign":"campaigns"}. Load, export or delete.` : "No saves yet. Import one from a file."}</p></div></button>
       <button className="menu-card slab" disabled=${!recent} style=${!recent?{opacity:.5}:null} onClick=${async()=>{ if (recent){ await cont(recent.id); store.set({tab:"character"}); } }}><${Icon} n="helm"/><div><h3>Character</h3><p>${recent ? `Open ${recent.char}'s sheet.` : "Create a character first."}</p></div></button>
       ${window.Net && html`<button className="menu-card slab" onClick=${()=>openModal({type:"online"})}><${Icon} n="user"/><div><h3>Play online</h3><p>Host your campaign for friends, or join a room with a code.</p></div></button>`}
+      <button className="menu-card slab" onClick=${()=>openModal({type:"trophies"})}><${Icon} n="gem"/><div><h3>Achievements & Hall of Fame</h3><p>Your trophies, and the heroes who finished their stories.</p></div></button>
       <button className="menu-card slab" onClick=${()=>openModal({type:"help"})}><${Icon} n="book"/><div><h3>How to play</h3><p>Travel, towns, your party, combat and dungeons in two minutes.</p></div></button>
       <button className="menu-card slab" onClick=${()=>openModal({type:"settings"})}><${Icon} n="gear"/><div><h3>Settings</h3><p>Dungeon Master style, sound, animations, theme and saves.</p></div></button>
     </div>
-    <div className="faint" style=${{fontSize:13}}>${s.caps.storage === "cloud" ? "Saves sync to your Claude account." : "Saves are kept in this browser."}</div>
+    <div className="faint" style=${{fontSize:13}}>${s.caps.storage === "cloud" ? (window.__WEB__ ? "Saves are backed up online with your save code." : "Saves sync to your Claude account.") : "Saves are kept in this browser."}</div>
   </div>`;
 }
 

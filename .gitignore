@@ -5,3 +5,6 @@ public/index.html
 public/platform.js
 public/net.js
 public/jpatch.js
+
+test-results/
+playwright-report/

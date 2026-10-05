@@ -48,7 +48,7 @@ function Portrait({ ch, size = 48, className = "" }){
   const eyeGlow = gear && cls === "Warlock" ? A.trim : race === "Tiefling" ? "#f2c14e" : null;
   const eyeY = headCy, bx = 50;
   const longBack = !hooded && ["long", "braids"].includes(L.style);
-  return html`<svg className=${"portrait " + className} width=${size} height=${size} viewBox="0 0 100 100" role="img" aria-label=${`Portrait of ${ch.name || "a hero"}`}>
+  return html`<svg xmlns="http://www.w3.org/2000/svg" className=${"portrait " + className} width=${size} height=${size} viewBox="0 0 100 100" role="img" aria-label=${`Portrait of ${ch.name || "a hero"}`}>
     <defs>
       <radialGradient id=${uid0 + "bg"} cx="50%" cy="35%" r="75%"><stop offset="0%" stopColor=${shade(A.bg, 1.55)}/><stop offset="100%" stopColor=${shade(A.bg, 0.75)}/></radialGradient>
       <radialGradient id=${uid0 + "sk"} cx="42%" cy="38%" r="70%"><stop offset="0%" stopColor=${shade(skin, 1.08)}/><stop offset="100%" stopColor=${shade(skin, 0.86)}/></radialGradient>

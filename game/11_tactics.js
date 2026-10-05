@@ -65,6 +65,8 @@ function objectiveProgress(c){
 }
 // called at the start of every new round
 function tacticsRound(c){
+  try { if (c.combat?.round === 1 || !c.combat?.factionAlly) factionAllies(c); } catch (e) { console.warn(e); }
+  try { lairAction(c); } catch (e) { console.warn("lair action", e); }
   const cm = c.combat; if (!cm || cm.status !== "active") return;
   cm.melee = {};
   if (cm.reinforce && cm.round >= cm.reinforce.round && !cm.reinforce.done){

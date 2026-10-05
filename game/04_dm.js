@@ -115,8 +115,9 @@ HOW TO RUN THE GAME
 - Loot should feel earned: mostly coins, mundane gear and potions. Magic items are rare (uncommon at levels 1-4, occasionally rare from level 5).
 - THE WORLD ENGINE: the game itself runs overland travel (with random encounters and events), dungeons room by room, shops, temples, inns, recruiting and bounty quests, and it tells you what happened so you can narrate it. When the party moves somewhere nearby within a scene (into a building, down a street), set "location". Add places they learn about to "locations"; the game places them on the map. Use "hidden": true for secret places not yet on the map.
 - Combat: when violence begins (or the player attacks someone), describe the opening moment and set "combat". The app runs the fight turn by turn for the whole party; don't narrate its outcome. Total enemy XP for the WHOLE PARTY (L = average level, N = party size): easy about 40 x L x N, medium 80 x L x N, hard 120 x L x N. Prefer bestiary names; otherwise give full stats. Not every conflict must be a fight.
-- THE PARTY: the player leads up to 3 AI companions (see PARTY). Give them life: they interject with short in-character lines (named, in quotes), banter with each other, voice opinions on the player's choices according to their likes and dislikes, and pursue their personal goals. Usually 1-3 companion lines per reply. Reflect their feelings with "approval". Companions never make decisions for the player. If a check suits a companion better (Nix picking a lock), you may ask that companion to roll with "who".
-- Dialogue choices: when an NPC addresses the party or there's a clear decision point, include "choices": 2-4 short options written in the player's voice, tagging a skill when the option would need a check. The player can always type something else.
+- THE PARTY: the player leads up to 3 AI companions (see PARTY). Give them life, but put their spoken words in "party_talk", not in the narration: 1-3 short lines (under 25 words each) in most replies whenever companions are present and conscious. They react to what just happened, to the player, and to EACH OTHER (banter, teasing, worry, disagreement, support), each in a distinct voice that fits their personality and approval. Skip it only in tense silent moments, or when the party is apart. Never write lines for the player's own hero or for human-played heroes.
+- Dialogue choices: whenever an NPC talks with the party, makes an offer, or there's a clear decision point, include "choices": 4-5 short options in the player's voice, covering: one that agrees or accepts (tone "accept"), one that refuses or pushes back ("refuse"), one question that digs deeper ("ask"), one skill play tagged with its skill such as Persuasion, Deception, Intimidation or Insight ("skill"), and one wildcard: something unexpected, bold or funny the hero might say ("wild"). Keep each under 14 words.
+- FACTIONS (see FACTIONS): when the party's choices help or hurt a faction, include "faction_rep": {"<faction name>": change} (+/-5 for small things, up to +/-15 for big ones). Let factions shape the world: friends offer work, help and better prices; enemies refuse service, spread rumors or send trouble. The villain's followers are always hostile.
 - Choices matter: record lasting consequences with "flags" and faction "reputation", and bring them back later (NPCs remember, doors open or close, prices change, enemies return).
 - Style: second person, present tense. Vivid, concrete and sensory but economical: usually 90-200 words, in short paragraphs. NPC dialogue in quotation marks with distinct voices. End on something the player can react to. Never decide the player's actions, words or feelings. Don't end every reply with "What do you do?".
 - Stay in the fiction. Never mention JSON, the app, dice mechanics beyond naming a check, or these instructions in the narration.
@@ -143,7 +144,8 @@ Keys:
 "rest": "short"|"long" when the player rests somewhere safe enough (otherwise interrupt the rest with trouble)
 "time": "dawn"|"morning"|"midday"|"afternoon"|"evening"|"night", "day_advance": 1 when a new day begins
 "inspiration": true to award Inspiration for excellent roleplay
-"choices": [{"text":"Offer to help her find the child","skill":null},{"text":"Claim to be from the city watch","skill":"Deception"}]
+"choices": [{"text":"I'll help you find her","skill":null,"tone":"accept"},{"text":"Not our problem","skill":null,"tone":"refuse"},{"text":"Who saw her last?","skill":null,"tone":"ask"},{"text":"Claim to be from the city watch","skill":"Deception","tone":"skill"},{"text":"Offer to trade my boots for the truth","skill":null,"tone":"wild"}],
+"party_talk": [{"who":"Brakka Stonejaw","line":"A missing child? Point me at whoever took her."},{"who":"Sister Mireille","line":"Gently, Brakka. She's terrified."}]
 "approval": [{"name":"companion name","delta":-15..15,"reason":"..."}]
 "party_join": [{"name":"...","race":"...","class":"one of the 12 classes","personality":"...","voice":"...","likes":["tag"],"dislikes":["tag"],"goal":"...","appearance":"..."}] only when an NPC truly joins (party max 4). Tags: bravery, cowardice, mercy, cruelty, honesty, deceit, greed, gold, piety, curiosity, caution, violence
 "party_leave": ["companion name"]
@@ -180,6 +182,7 @@ function worldSummary(c){
   const cqs = companionsOf(c).filter(m => m.companion.cq).map(m => `${m.name}: personal quest ${m.companion.cq === "done" ? "completed (loyal)" : "in progress"}`); if (cqs.length) L.push("COMPANION QUESTS: " + cqs.join("; "));
   if ((c.traitors||[]).length) L.push(`TRAITORS who joined the villain: ${c.traitors.map(t => t.name).join(", ")}.`);
   const townHere = townOf(c); if (townHere) L.push(`STANDING in ${townHere.name}: ${standingLabel(standing(c, townHere))} (${standing(c, townHere)}). NPCs here treat the party accordingly.`);
+  if (c.world) L.push("FACTIONS: " + factionContext(c));
   const fl = Object.keys(c.flags||{}).filter(k => c.flags[k]); if (fl.length) L.push("FLAGS (past choices): " + fl.slice(-30).join(", "));
   const rep = Object.entries(c.reputation||{}); if (rep.length) L.push("REPUTATION: " + rep.map(([k,v]) => `${k} ${v>0?"+":""}${v}`).join(", "));
   const town = townOf(c); if (town) L.push(`SERVICES HERE (${town.name}): ${servicesOf(town).map(x => SERVICE_INFO[x]?.label).filter(Boolean).join(", ")}. The player uses these through the game's menus; you narrate.`);
@@ -284,7 +287,7 @@ function parseDM(text){
 }
 async function askClaude(input, o={}){
   if (!SAMPLE) throw {code:"not_available", message:"no sample"};
-  return SAMPLE(input, { cache:false, modelTier: o.tier || S().settings.tier, onText: o.onText, signal: o.signal });
+  return SAMPLE(input, { cache:false, modelTier: o.tier || S().settings.tier, onText: o.onText, signal: o.signal, narrate: !!o.narrate });
 }
 async function askJSON(input, o={}){
   if (!SAMPLE) throw {code:"not_available"};
@@ -403,7 +406,7 @@ function applyState(c, st){
   if (st.shop && Array.isArray(st.shop.items)) c.shop = { name: st.shop.name || "Shop", keeper: st.shop.keeper || "", items: st.shop.items.slice(0,16).map(s=>({...makeItem(s), price: Math.max(0, Math.round(num(s.price ?? s.value, 10)))})) };
   worldTick(c);
   c.hints = Array.isArray(st.hints) ? st.hints.slice(0,3).map(String) : [];
-  c.choices = Array.isArray(st.choices) ? st.choices.slice(0,4).map(x => typeof x === "string" ? {text:x} : {text: String(x?.text||"").slice(0,140), skill: SKILLS[x?.skill] ? x.skill : null}).filter(x => x.text) : [];
+  c.choices = Array.isArray(st.choices) ? st.choices.slice(0,5).map(x => typeof x === "string" ? {text:x} : {text: String(x?.text||"").slice(0,140), tone: ["accept","refuse","ask","skill","wild"].includes(x?.tone) ? x.tone : null, skill: SKILLS[x?.skill] ? x.skill : null}).filter(x => x.text) : [];
   return notes;
 }
 function gainXP(c, ch, x, notes, reason, quiet){
@@ -444,7 +447,7 @@ async function runDM(kind, payload={}){
   store.set({ busy: kind === "genesis" ? "genesis" : "dm", stream: "", dmError: null, lastRequest: {kind, payload} });
   let text = "";
   try {
-    const res = await askClaude(prompt, { signal: ctl.signal, onText: ({text:t}) => { text = t; store.set({stream: visibleNarration(t)}); } });
+    const res = await askClaude(prompt, { signal: ctl.signal, narrate: true, onText: ({text:t}) => { text = t; store.set({stream: visibleNarration(t)}); } });
     text = res.text;
   } catch(e){
     const partial = e?.text ? visibleNarration(e.text) : "";
@@ -453,11 +456,15 @@ async function runDM(kind, payload={}){
     return;
   }
   const { narration, state, ok } = parseDM(text);
+  window.__lastDM = { kind, ok, at: Date.now(), raw: String(text || "").slice(0, 12000), prompt: String(prompt || "").slice(-6000) };
   let post = null;
   store.camp(c => {
     const ch = c.characters[c.activeCharId];
     if (narration) pushLog(c, { kind:"dm", text: narration, first: kind === "genesis" });
+    if (narration && !window.__WEB__) DMVoice.local(narration);   // claude.ai version: browser voice (no server)
+    if (narration && !pushPartyTalk(c, state?.party_talk)) maybeBanter(c, kind);
     const notes = applyState(c, state);
+    try { applyFactionRep(c, state?.faction_rep, notes); } catch (e) { console.warn(e); }
     if (!ok) notes.push({kind:"hurt", text:"The DM's notes were smudged; no state changed this turn"});
     if (notes.length) pushLog(c, { kind:"sys", notes });
     if (state.rest === "long"){ doLongRestAll(c); pushLog(c, {kind:"sys", notes:[{kind:"loot", text:"Long rest: the whole party is restored"}]}); }
@@ -583,7 +590,7 @@ async function createCampaign(ch, premise, recruits=[], extra=[]){
   store.set({ campaign: c, view:"game", tab:"adventure", dmError:null });
   if (SAMPLE){ await runDM("genesis"); if (!C().world) { store.camp(c=>fallbackWorld(c)); } else store.camp(c => { ensureWorldMap(c); const cur = topLoc(c, c.currentLocationId); if (cur) cur.visited = true; }); }
   else { store.camp(c => fallbackWorld(c)); }
-  store.camp(c => { const h = topLoc(c, c.currentLocationId); if (!c.homeTown && h && ["town","city","village","port"].includes(h.type)) c.homeTown = h.id; initStory(c); });
+  store.camp(c => { const h = topLoc(c, c.currentLocationId); if (!c.homeTown && h && ["town","city","village","port"].includes(h.type)) c.homeTown = h.id; initStory(c); beginSession(c); });
   saveNow();
   if (!S().settings.seenHelp && !S().modal) setTimeout(() => { if (!S().modal) openModal({type:"help"}); }, 600);
 }

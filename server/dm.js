@@ -1,3 +1,5 @@
+import { narrate } from "./tts.js";
+import { voiceToRoom } from "./rooms.js";
 // Dungeon Master proxy: streams the AI's reply back to the browser as
 // server-sent events: {delta} chunks, then {done} or {error}.
 // Providers: "anthropic" (Claude) or "gemini" (Google; has a free tier).
@@ -111,8 +113,11 @@ export async function checkKey() {
   return keyCheck;
 }
 
+// Matches the start of the game-state block that follows the narration (same forms the game accepts).
+const STATE_RX = /(?:^|\n)[ \t*_#>`]*(?:<{2,3}\s*STATE\s*>{2,3}|STATE\s*(?:JSON)?\s*:)/i;
 export async function dmHandler(req, res) {
   const { system = null, input, tier = "default", json = false } = req.body || {};
+  const voice = !json && req.body?.voice && typeof req.body.voice === "object" ? req.body.voice : null;
   if (typeof input !== "string" || !input.trim()) return res.status(400).json({ code: "invalid_request", message: "Missing input." });
   if (input.length + (system ? String(system).length : 0) > MAX_INPUT_CHARS) return res.status(413).json({ code: "prompt_too_large", message: "The story grew too long to send." });
   const t = MODELS.anthropic[tier] ? tier : "default";
@@ -127,14 +132,42 @@ export async function dmHandler(req, res) {
   }
 
   res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
-  const send = (o) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(o)}\n\n`); };
-  if (MOCK) { await mockReply({ input: (system ? system + "\n\n" : "") + input, json }, send); return res.end(); }
+  const sendRaw = (o) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(o)}\n\n`); };
+  // DM voice: as soon as the narration is complete (the state block starts), generate the clip once
+  // and tell the solo player over this stream, or everyone in the room over their sockets.
+  let acc = "", voiced = false;
+  const speak = (final) => {
+    if (!voice || voiced) return;
+    let narr = acc;
+    if (/^\s*\{/.test(acc)) { if (!final) return; try { narr = String(JSON.parse(acc).narration || ""); } catch { narr = ""; } }
+    else { const m = acc.match(STATE_RX); if (m) narr = acc.slice(0, m.index); else if (!final) return; }
+    voiced = true;
+    const v = narrate(narr.replace(/^\s*narration\s*:\s*/i, ""), ["en", "pt", "es"].includes(voice.lang) ? voice.lang : undefined); if (!v) return;
+    const payload = { ...v, at: Date.now() };
+    const roomed = voice.room ? voiceToRoom(voice.room, voice.pid, voice.token, payload) : false;
+    sendRaw({ voice: { ...payload, roomed } });
+  };
+  let sentAny = false;
+  const send = (o) => { if (o.delta) sentAny = true; sendRaw(o); if (voice && o.delta && !voiced) { acc += o.delta; speak(false); } };
+  if (MOCK) { await mockReply({ input: (system ? system + "\n\n" : "") + input, json }, send); speak(true); return res.end(); }
 
   let abort = null, clientGone = false;
   res.on("close", () => { if (!res.writableEnded) { clientGone = true; abort?.(); } });
   try {
     const run = provider === "gemini" ? streamGemini : streamAnthropic;
-    const out = await run({ key, model: MODELS[provider][t], system: system ? String(system) : null, input, json, maxTokens: MAX_TOKENS[t], send, onAbort: (f) => { abort = f; } });
+    // If a model is busy or unavailable, fall back to the next lighter one (only before any text has streamed).
+    const chain = [...new Set([t, ...(t === "complex" ? ["default", "quick"] : t === "default" ? ["quick"] : [])].map(x => MODELS[provider][x]))];
+    const retryable = (e) => [404, 429, 500, 502, 503, 504].includes(Number(e?.status)) || /overload|high demand|unavailable|not found|exhausted|try again/i.test(String(e?.message || ""));
+    let out;
+    for (let i = 0; i < chain.length; i++) {
+      try { out = await run({ key, model: chain[i], system: system ? String(system) : null, input, json, maxTokens: MAX_TOKENS[t], send, onAbort: (f) => { abort = f; } }); break; }
+      catch (e) {
+        if (clientGone || sentAny || !retryable(e) || i === chain.length - 1) throw e;
+        console.warn(`DM model ${chain[i]} unavailable (${e?.status || "error"}): falling back to ${chain[i + 1]}`);
+        sendRaw({ notice: "The storyteller model was busy, so this reply uses a lighter model." });
+      }
+    }
+    speak(true);
     send({ done: true, truncated: out.truncated, tier: t });
   } catch (e) {
     if (!clientGone) { console.warn(`DM error (${provider}):`, e?.status || "", String(e?.message || e).slice(0, 200)); send({ error: mapError(e, provider) }); }

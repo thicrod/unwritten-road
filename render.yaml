@@ -14,6 +14,9 @@ services:
         sync: false
       - key: SITE_PASSWORD
         sync: false
+      # Optional, for cloud saves: a Postgres connection string (e.g. a free Neon database)
+      - key: DATABASE_URL
+        sync: false
       - key: DM_PROVIDER
         value: gemini
       - key: NODE_VERSION

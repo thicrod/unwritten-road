@@ -52,7 +52,7 @@ function buildCompanion(tpl, level=1){
   const ch = buildCharacter(dr);
   ch.companion = { tpl: tpl.id || slug(tpl.name), personality: tpl.personality || "", voice: tpl.voice || "", likes: tpl.likes || [], dislikes: tpl.dislikes || [], hook: tpl.hook || "",
     role, tactic: role === "support" ? "support" : "balanced", ctrl: "ai", approval: 10, joined: null };
-  let guard = 0; while (ch.level < clamp(level,1,MAX_LEVEL) && guard++ < 12){ ch.xp = Math.max(ch.xp, XP_TABLE[ch.level]); applyLevelUp(ch, autoLevelChoices(ch, tpl.sub || 0)); }
+  let guard = 0; while (ch.level < clamp(level,1,MAX_LEVEL) && guard++ < 25){ ch.xp = Math.max(ch.xp, XP_TABLE[ch.level]); applyLevelUp(ch, autoLevelChoices(ch, tpl.sub || 0)); }
   ch.hp = maxHp(ch);
   return ch;
 }

@@ -74,6 +74,7 @@ const Coop = {
   optionsFor(c, kind, payload){
     if (kind === "travel"){ const to = c.locations[payload.to]; return to ? { title: `Travel to ${to.name}?`, options: [{ id: "yes", label: `Go to ${to.name}` }, { id: "no", label: "Stay here" }] } : null; }
     if (kind === "camp") return { title: "Make camp for the night?", options: [{ id: "yes", label: "Make camp" }, { id: "no", label: "Keep going" }] };
+    if (kind === "fast"){ const f = fastTravelInfo(c, payload.to); return f ? { title: `Fast travel to ${f.to.name}? (${f.days} day${f.days > 1 ? "s" : ""}${f.cost ? `, ${f.cost} gp` : ""})`, options: [{ id: "yes", label: `Go to ${f.to.name}` }, { id: "no", label: "Stay here" }] } : null; }
     if (kind === "event"){ const ev = currentEvent(c); return ev ? { title: ev.title, options: ev.choices.map((x, i) => ({ id: String(i), label: x.label })) } : null; }
     if (kind === "choice"){ const ch = c.choices || []; return ch.length ? { title: "What does the party do?", options: ch.map((x, i) => ({ id: String(i), label: x.text })) } : null; }
     return null;
@@ -106,6 +107,7 @@ const Coop = {
   execute(kind, payload, choice){
     if (kind === "travel"){ if (choice !== "no") beginTravel(payload.to); }
     else if (kind === "camp"){ if (choice !== "no") requestRest("long"); }
+    else if (kind === "fast"){ if (choice !== "no") fastTravel(payload.to); }
     else if (kind === "event"){ closeModal(); resolveEvent(+choice); }
     else if (kind === "choice"){ const x = (C().choices || [])[+choice]; if (x) runDM("action", { text: x.text, mode: /^["“]/.test(x.text) ? "say" : "do", who: Coop.on() ? "The party" : undefined }); }
   },
@@ -151,7 +153,7 @@ const Coop = {
       const pr = c.pendingRoll; if (!pr || !pr.who || Net.controllerOf(c, { kind: "pc", ref: pr.who, main: pr.who === c.activeCharId }) !== pid) return;
       doPendingRoll({ who: pr.who });
     } else if (it.type === "action"){ if (typeof it.text === "string" && it.text.trim()) this.hostAction(pid, it.text.trim(), it.mode === "say" ? "say" : "do"); }
-    else if (it.type === "propose"){ if (["travel", "camp", "event", "choice"].includes(it.kind)) this.hostPropose(pid, it.kind, it.payload, it.choice); }
+    else if (it.type === "propose"){ if (["travel", "camp", "event", "choice", "fast"].includes(it.kind)) this.hostPropose(pid, it.kind, it.payload, it.choice); }
     else if (it.type === "vote"){ this.hostVote(pid, it.voteId, it.option); }
     else if (it.type === "addHero"){ if (it.draft && typeof it.draft === "object") hostAddHero(pid, it.draft); }
     else if (it.type === "call"){
@@ -233,7 +235,7 @@ async function startFromLobby(){
 function hostAddHero(pid, draft){
   const c = C(); if (!c || partyMembers(c).length >= MAX_PARTY || Object.values(Net.room.seats || {}).includes(pid)) return;
   let ch; try { ch = buildCharacter(draft); } catch { return; }
-  const lvl = partyLevel(c); let g = 0; while (ch.level < lvl && g++ < 12){ ch.xp = Math.max(ch.xp, XP_TABLE[ch.level]); applyLevelUp(ch, autoLevelChoices(ch)); }
+  const lvl = partyLevel(c); let g = 0; while (ch.level < lvl && g++ < 25){ ch.xp = Math.max(ch.xp, XP_TABLE[ch.level]); applyLevelUp(ch, autoLevelChoices(ch)); }
   ch.hp = maxHp(ch); ch.companion = playerHeroBlock(ch, pid, Net.playerName(pid));
   store.camp(c => { addToParty(c, ch, "joined the adventure"); pushLog(c, { kind: "sys", notes: [{ kind: "npc", text: `${ch.name} (${Net.playerName(pid)}) joins the party` }] }); });
   Net.assignSeat(ch.id, pid);

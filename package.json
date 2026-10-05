@@ -12,15 +12,24 @@
     "start": "node server/index.js",
     "dev": "node tools/build.js && MOCK_DM=1 node server/index.js",
     "check-key": "node tools/check-key.js",
-    "loadtest": "node tools/loadtest.js"
+    "loadtest": "node tools/loadtest.js",
+    "test": "node --test tests/unit/*.test.js",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "compression": "^1.8.2",
+    "esbuild": "^0.28.2",
     "express": "^5.2.1",
+    "pg": "^8.23.1",
     "socket.io": "^4.8.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "htm": "^3.1.1",
+    "pg-mem": "^3.0.14",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "socket.io-client": "^4.8.4"
   }
 }

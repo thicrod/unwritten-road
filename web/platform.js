@@ -23,7 +23,8 @@
       res = await fetch("/api/dm", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(userKey() ? { "X-User-Key": userKey() } : {}) },
-        body: JSON.stringify({ system, input: body, tier: opts.modelTier || "default", json }),
+        body: JSON.stringify({ system, input: body, tier: opts.modelTier || "default", json,
+          voice: opts.narrate && !json ? { room: window.Net?.room?.code || null, pid: window.Net?.me?.id, token: window.Net?.me?.token, lang: (typeof S === "function" && S()?.settings?.dmLanguage) || "en" } : undefined }),
         signal: opts.signal,
       });
     } catch (e) {
@@ -49,6 +50,8 @@
           const ev = JSON.parse(line.slice(5));
           if (ev.error) throw ev.error;
           if (ev.delta) { text += ev.delta; opts.onText && opts.onText({ text, delta: ev.delta }); }
+          if (ev.voice) { try { window.DMVoice?.fromServer(ev.voice); } catch {} }
+          if (ev.notice && typeof toast === "function") toast(ev.notice);
           if (ev.done) meta = ev;
         }
       }
@@ -69,7 +72,16 @@
     throw { code: "upstream_error", message: "The Dungeon Master's reply couldn't be read. Try again." };
   };
 
+  // cloud saves: the server stores campaigns under this device's private save code
+  const cloudOn = !!(window.__UR_CONFIG || {}).cloud, CODE = "ur:savecode";
+  const rid = (n) => { const a = "abcdefghijkmnpqrstuvwxyz23456789"; let s = ""; for (const x of crypto.getRandomValues(new Uint8Array(n))) s += a[x % a.length]; return s; };
+  const saveCode = () => { let c = ""; try { c = localStorage.getItem(CODE) || ""; } catch {} if (!/^[a-z0-9]{12,40}$/.test(c)){ c = rid(16); try { localStorage.setItem(CODE, c); } catch {} } return c; };
+  const cloudDb = { collection(p){ const base = "/api/saves/" + String(p).split("/").pop(); return { doc(id){ const u = `${base}/${encodeURIComponent(id)}`; return {
+    async get(){ const r = await fetch(u); if (r.status === 404) return { exists: false, data: () => null }; if (!r.ok) throw new Error("cloud " + r.status); const j = await r.json(); return { exists: true, data: () => j.data }; },
+    async set(data){ const r = await fetch(u, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) }); if (!r.ok) throw new Error("cloud " + r.status); },
+    async delete(){ await fetch(u, { method: "DELETE" }); } }; } }; } };
+  window.urCloud = { on: cloudOn, code: saveCode, use(c){ c = String(c || "").toLowerCase().replace(/[^a-z0-9]/g, ""); if (!/^[a-z0-9]{12,40}$/.test(c)) return false; try { localStorage.setItem(CODE, c); } catch {} location.reload(); return true; } };
   window.urApiKey = { get: userKey, set: (k) => { try { k ? localStorage.setItem(KEY_STORE, k.trim()) : localStorage.removeItem(KEY_STORE); } catch {} } };
   // Only the AI is provided on the web; saves use the browser's storage.
-  window.claude = { use: async (name) => (name === "sample" ? sample : null) };
+  window.claude = { use: async (name) => name === "sample" ? sample : name === "db" && cloudOn ? cloudDb : name === "user" && cloudOn ? { id: async () => saveCode() } : null };
 })();

@@ -22,6 +22,8 @@ if (provider === "gemini") {
       const text = raw.split("\n").filter(l => l.startsWith("data:")).map(l => { try { return (JSON.parse(l.slice(5)).candidates?.[0]?.content?.parts || []).map(p => p.text || "").join(""); } catch { return ""; } }).join("").trim();
       console.log(`✓ ${tier.padEnd(13)} ${model}: "${text || "(empty reply)"}" (${Date.now() - t0} ms)`);
     } catch (e) {
+      // a busy model (503) is temporary, and the game falls back to a lighter model automatically
+      if (e.status === 503 && !tier.startsWith("quick")) { console.log(`⚠ ${tier.padEnd(13)} ${model}: busy right now (503). Not a key problem: the game falls back to the lighter model automatically.`); continue; }
       failed = true; console.log(`✗ ${tier.padEnd(13)} ${model}: ${why(e)}`);
       if (e.status === 429) console.log("  (free-tier quota reached: wait a minute, or the daily limit resets at midnight Pacific time)");
     }

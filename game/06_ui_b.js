@@ -179,7 +179,7 @@ function Game(){
       ${window.Net && html`<${OnlineChip}/>`}
       <button onClick=${()=>saveNow(true)}><${Icon} n="save"/><span>Save</span></button>
       <button onClick=${()=>openModal({type:"settings"})}><${Icon} n="gear"/><span>Settings</span></button>
-      <button onClick=${()=>{ const go = () => { saveNow(); store.set({view:"home", campaign:null, tab:"adventure"}); }; if (window.Net?.isOnline()) openModal({type:"confirm", text:"Leave the online room and go to the main menu?", okLabel:"Leave", ok:()=>{ window.Net.leave(); go(); }}); else go(); }}><${Icon} n="home"/><span>Home</span></button>
+      <button onClick=${()=>{ const go = () => { const x = C() && sessionSummary(C()); if (x && (x.fights > 0 || x.minutes >= 10) && !window.Net?.isGuest()) return openModal({type:"session", then:"home"}); saveNow(); store.set({view:"home", campaign:null, tab:"adventure"}); }; if (window.Net?.isOnline()) openModal({type:"confirm", text:"Leave the online room and go to the main menu?", okLabel:"Leave", ok:()=>{ window.Net.leave(); go(); }}); else go(); }}><${Icon} n="home"/><span>Home</span></button>
     </nav>
     <header className="topbar">
       <button className="btn ghost sm" onClick=${()=>{ saveNow(); store.set({view:"home", campaign:null}); }} aria-label="Home"><${Icon} n="home" size=${18}/></button>
@@ -188,7 +188,7 @@ function Game(){
       <button className="chip hp" onClick=${()=>store.set({asideOpen:true})} aria-label="Open party status and dice">${ch.hp}/${maxHp(ch)} HP</button>
       <button className="btn ghost sm" onClick=${()=>store.set({asideOpen:true})} aria-label="Dice and status"><${Icon} n="d20" size=${18}/></button>
     </header>
-    <main className="main">${window.Net && html`<${SpectatorBanner}/>`}${window.Net && html`<${VoteBar}/>`}${coachFor(s.tab, c)}${view}</main>
+    <main className="main">${window.Net && html`<${SpectatorBanner}/>`}${window.Net && html`<${VoteBar}/>`}${coachFor(s.tab, c)}${view}<${VoiceChip}/></main>
     ${window.Net && html`<${ChatPanel}/>`}
     <${Aside}/>
     ${s.asideOpen && html`<div className="scrim" onClick=${()=>store.set({asideOpen:false})}></div>`}
@@ -199,7 +199,8 @@ function Game(){
 
 // ---------- Adventure ----------
 function LogEntry({ e }){
-  if (e.kind === "dm") return html`<div className=${"entry dm" + (e.first ? " first" : "")}><${Md} text=${e.text}/></div>`;
+  if (e.kind === "dm") return html`<div className=${"entry dm" + (e.first ? " first" : "")}><${Md} text=${e.text}/><button className="report-flag" title="Report a problem with this reply" aria-label="Report a problem with this reply" onClick=${() => openModal({ type: "report", entry: e.text })}>⚑</button></div>`;
+  if (e.kind === "talk") return html`<${TalkEntry} e=${e}/>`;
   if (e.kind === "player") return html`<div className="entry player"><b>${e.who ? `${e.who}${e.mode === "say" ? " says " : ": "}` : e.mode === "say" ? "You say " : "You: "}</b>${e.mode === "say" ? html`<span className="say">"${e.text.replace(/^"|"$/g,"")}"</span>` : e.text}</div>`;
   if (e.kind === "roll"){ const r = e.data || {};
     if (r.group) return html`<div className="entry roll"><div className="rollchip"><${DieFace} sides=${20} value=${"✦"} size=${30}/><span>${r.group}</span><span className=${r.success ? "ok" : "no"}>${r.success ? "Success" : "Failure"}</span></div></div>`;
@@ -248,7 +249,9 @@ function PlaceBar(){
   if (town) for (const sv of servicesOf(town)) btns.push(html`<button key=${sv} className="chip svc" disabled=${busy} onClick=${()=>["market","smith"].includes(sv) ? openShop(town.id, sv) : openModal({type:"service", svc: sv, town: town.id})}><${Icon} n=${SERVICE_INFO[sv].icon} size=${15}/> ${SERVICE_INFO[sv].label}</button>`);
   if (isDelvable(here)) btns.push(html`<button key="delve" className="chip svc danger" disabled=${busy} onClick=${()=>enterDungeon(here.id)}><${Icon} n="dungeon" size=${15}/> ${here.fallen ? `Liberate ${here.name}` : here.dungeon ? (here.cleared ? `Revisit ${here.name}` : `Delve into ${here.name}`) : `Explore ${here.name}`}</button>`);
   btns.push(html`<button key="travel" className="chip" disabled=${busy} onClick=${()=>store.set({tab:"map"})}><${Icon} n="road" size=${15}/> Travel</button>`);
-  return html`<div className="placebar">${btns}</div>`;
+  const baseBtn = !townOf(c) ? null : inBaseTown(c) ? html`<button key="base" className="chip" onClick=${()=>openModal({type:"base"})}>🏠 ${c.base.name}</button>`
+    : canBuyBase(c) ? html`<button key="base" className="chip" title=${`Buy a hall here as your party's base (${BASE_COST} gp)`} onClick=${()=>openModal({type:"confirm", text:`Buy a hall in ${townOf(c).name} as your party's base for ${BASE_COST} gold? Resting there is free, and you can build upgrades.`, okLabel:"Buy it", ok:()=>buyBase()})}>🏠 Buy a base</button>` : null;
+  return html`<div className="placebar">${btns}${baseBtn}</div>`;
 }
 function trackedQuest(c){ const act = Object.values(c.quests).filter(q => q.status === "active"); const here = topLoc(c, c.currentLocationId)?.id;
   return act.find(q => q.auto?.loc && q.auto.loc === here) || act.find(q => q.id === (S().trackedLocal || c.trackedQuest)) || act.find(q => q.kind === "main") || act[0] || null; }
@@ -286,7 +289,7 @@ function Adventure(){
   ];
   const genesis = s.busy === "genesis";
   const choices = !blocked ? (c.choices || []) : [];
-  return html`<div className="adv">
+  return html`<div className="adv"><${SceneBanner} c=${c}/>
     <div className="adv-head">
       <div className="loc-ico"><${Icon} n=${loc?.type || "road"}/></div>
       <div className="place"><h2>${loc?.name || "The road"}</h2><div className="sub">${parent ? `${parent.name} · ` : ""}${c.world?.name ? `${c.world.name} · ` : ""}Day ${c.time.day}, ${c.time.phase}</div></div>
@@ -300,7 +303,8 @@ function Adventure(){
       ${busy && s.busy !== "combat" && (s.stream ? html`<div className="entry dm streaming"><${Md} text=${s.stream}/></div>`
         : html`<div className="thinking"><span className="candle"></span><span>${genesis ? "The Dungeon Master is building your world…" : "The Dungeon Master considers…"}</span><button className="btn ghost sm" onClick=${stopDM}>Stop</button></div>`)}
       ${s.dmError && html`<div className="banner bad" style=${{margin:"10px 0"}}><span className="grow">${s.dmError}</span>${s.lastRequest && s.retryable !== false && html`<button className="btn sm" onClick=${()=>{ const r = S().lastRequest; store.set({dmError:null}); if (r.kind === "action"){ store.camp(c => { const last = c.log[c.log.length-1]; if (last?.kind === "player") c.log.pop(); }); } runDM(r.kind, r.payload); }}>Try again</button>`}</div>`}
-      ${choices.length > 0 && html`<div className="choices" role="group" aria-label="Dialogue choices">${choices.map((x,i)=>html`<button key=${i} className="choice" onClick=${()=>coopDialogue(i)}>${x.skill ? html`<span className="tag">${x.skill}</span>` : html`<span className="tag talk">›</span>`}${x.text}</button>`)}</div>`}
+      ${choices.length > 0 && html`<div className="choices" role="group" aria-label="Dialogue choices">${choices.map((x,i)=>html`<button key=${i} className=${"choice" + (x.tone ? " tone-" + x.tone : "")} onClick=${()=>coopDialogue(i)}>${x.skill ? html`<span className="tag">${x.skill}</span>` : html`<span className=${"tag talk t-" + (x.tone || "none")} title=${x.tone || ""}>${{accept:"✓", refuse:"✕", ask:"?", wild:"🎲"}[x.tone] || "›"}</span>`}${x.text}</button>`)}
+        <div className="choice-extras"><button className="choice mini" disabled=${blocked} title="Your hero blurts out something unexpected" onClick=${()=>send(randomSay(), "say")}><span className="tag talk t-wild">🎲</span>Say something random</button><button className="choice mini" onClick=${()=>{ setMode("say"); document.querySelector(".composer textarea")?.focus(); }}><span className="tag talk">✎</span>Say something else…</button></div></div>`}
     </div><${PendingRoll}/></div>
     ${c.combat ? html`<div className="banner" style=${{margin:"0 16px 12px"}}><${Icon} n="swords"/><span className="grow">Battle is underway.</span><button className="btn primary sm" onClick=${()=>store.set({tab:"combat"})}>To combat</button></div>`
     : html`<div className="composer"><div className="composer-inner">
@@ -312,6 +316,7 @@ function Adventure(){
         <textarea rows=${2} value=${text} maxLength=${1200} disabled=${blocked}
           placeholder=${c.pendingRoll ? "Roll the dice first…" : spectating() && !busy ? `What does ${(window.Net.mySeat() && c.characters[window.Net.mySeat()]?.name.split(" ")[0]) || "your character"} do?` : busy ? "The Dungeon Master is speaking…" : mode === "say" ? "What do you say?" : "What do you do? Anything goes: sneak, bargain, climb, lie, cast…"}
           onInput=${e=>setText(e.target.value)} onKeyDown=${e=>{ if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); } }} aria-label="Your action"></textarea>
+        <${MicButton} disabled=${blocked} onText=${(t, fin) => { const m = t.match(/^(?:say|i say|digo|eu digo)\s*[,:]?\s+(.+)/i); if (m){ setMode("say"); setText(m[1]); } else setText(t); }}/>
         <button className="btn primary" disabled=${blocked || !text.trim()} onClick=${()=>send()} aria-label="Send"><${Icon} n="send" size=${18}/></button>
       </div>
     </div></div>`}

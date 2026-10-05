@@ -51,6 +51,14 @@ function hpRing(frac, size, color){ const r = size / 2 - 2, L = 2 * Math.PI * r;
 function Battlefield({ c, cm, sel, ally, cur, myTurn, onFoe, onAlly }){
   const [hidden, setHidden] = useState(() => S().settings.battleMap === false);
   const [banner, setBanner] = useState(null);
+  const barks = useBarks(c, cm);
+  // caption: the latest thing that happened, in plain words, for a few seconds
+  const [caption, setCaption] = useState(null);
+  useEffect(() => { const l = [...(cm.log || [])].reverse().find(x => x.text && x.kind !== "sys" && !/^Round \d/.test(x.text)); if (!l) return;
+    const t = l.text.replace(/\*\*/g, "").replace(/\[(\d+)\] \d+ vs AC \d+,?\s*/g, "").replace(/\s+/g, " ").trim(); if (!t) return;
+    setCaption({ t: t.length > 110 ? t.slice(0, 108) + "…" : t, k: cm.log.length }); const h = setTimeout(() => setCaption(p => p && p.k === cm.log.length ? null : p), 3600); return () => clearTimeout(h); }, [cm.log?.length]);
+  const order = (cm.order || []).filter(id => { const x = cm.cbt[id]; return x && !x.fled && isUp(c, x); });
+  const curIdx = order.indexOf(cur?.id);
   const turnKey = `${cm.id}:${cm.round}:${cm.turn}`;
   useEffect(() => { if (!myTurn || !cur) return; setBanner(turnKey); Sfx.play("buff"); const t = setTimeout(() => setBanner(b => b === turnKey ? null : b), 1300); return () => clearTimeout(t); }, [turnKey, myTurn]);
   const mobile = typeof innerWidth === "number" && innerWidth < 700;
@@ -68,7 +76,8 @@ function Battlefield({ c, cm, sel, ally, cur, myTurn, onFoe, onAlly }){
   for (const [g, list] of Object.entries(groups)){
     const cols = colsOf(list.length), per = Math.ceil(list.length / cols);
     list.forEach((x, i) => { const col = Math.floor(i / per), row = i % per, n = Math.min(per, list.length - col * per);
-      const y = 18 + (n === 1 ? 27 : (row * 54) / (n - 1));
+      const bossOn = Object.values(cm.cbt).some(e => e.side === "enemy" && e.boss && !e.fled);
+      const y = (bossOn ? 30 : 18) + (n === 1 ? (bossOn ? 22 : 27) : (row * (bossOn ? 44 : 54)) / (n - 1));
       const dx = cols === 2 ? (col === 0 ? -1 : 1) * (mobile ? 6.5 : 5.5) * (g.startsWith("party") ? 1 : -1) : 0;
       place.push({ x, left: COLX[g] + dx, top: y }); });
   }
@@ -95,10 +104,15 @@ function Battlefield({ c, cm, sel, ally, cur, myTurn, onFoe, onAlly }){
         ${!up ? html`<span className="bt-x">${x.side === "party" && pc && !pc.dead ? "DOWN" : "✕"}</span>` : null}
         ${conds.length ? html`<span className="bt-conds">${conds.map(n => html`<i key=${n} title=${cap(n)}>${COND_GLYPH[n] || n.slice(0, 1).toUpperCase()}</i>`)}</span>` : null}
         <span className="bt-name">${label(x)}</span>
+        ${(() => { const i = order.indexOf(x.id); if (i < 0 || curIdx < 0 || i === curIdx) return null; const rel = (i - curIdx + order.length) % order.length; return rel <= 3 ? html`<span className=${"bt-order" + (rel === 1 ? " next" : "")} title=${rel === 1 ? "Acts next" : `Acts in ${rel} turns`}>${rel}</span>` : null; })()}
+        ${barks[x.id] ? html`<span className=${"bt-bubble" + (isFoe ? " foe" : "")} key=${barks[x.id].at}>${barks[x.id].text}</span>` : null}
       </button>`; })}
     ${banner === turnKey && cur ? html`<div className="bt-banner">Your turn: ${label(cur)}</div>` : null}
+    ${caption ? html`<div className="bt-caption" key=${caption.k}>${caption.t}</div>` : null}
     <button className="bt-hide" onClick=${() => { setHidden(true); store.set({ settings: { ...S().settings, battleMap: false } }); }} aria-label="Hide battle map" title="Hide battle map">✕</button>
     <div className="bt-round">Round ${cm.round}</div>
+    <${BossBar} c=${c} cm=${cm}/>
+    ${cm.lairFx?.round === cm.round ? html`<div className="bt-banner lair" key=${"lair" + cm.round}>⚠ ${cm.lairFx.name}!</div>` : null}
   </div>`;
 }
 // ---------- first-time coach tips ----------

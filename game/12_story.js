@@ -7,6 +7,7 @@ const ACTS = { 1: "Investigate", 2: "Confront the lieutenant", 3: "Storm the lai
 const isQuick = (c) => c?.premise?.mode === "quick";
 function villainLair(c){ return c.villain?.lair ? c.locations[c.villain.lair] : null; }
 function initStory(c){
+  try { ensureFactions(c); } catch (e) { console.warn(e); }
   if (c.story || !c.villain || c.villainDefeated) return;
   const quick = isQuick(c);
   c.story = { act: 1, clues: 0, need: quick ? 1 : 3, lt: null, questId: null, log: [] };
@@ -62,7 +63,7 @@ function storyContext(c){
     : `the party knows the way to ${lair?.name} and must defeat ${v} there. Build toward the confrontation.`;
   return `MAIN STORY: Act ${act} of ${acts}, ${ACTS[st.act]}: ${goal} Keep side scenes short and connected to this goal; nudge the party back to it if they drift.${isQuick(c) ? " QUICK ADVENTURE: a one-evening story of about 90 minutes. Keep the pace brisk, and make every scene move toward the lair." : ""}`;
 }
-function levelHeroTo(ch, lvl){ let g = 0; while (ch.level < lvl && g++ < 12){ ch.xp = Math.max(ch.xp, XP_TABLE[ch.level]); applyLevelUp(ch, autoLevelChoices(ch)); } ch.hp = maxHp(ch); }
+function levelHeroTo(ch, lvl){ let g = 0; while (ch.level < lvl && g++ < 25){ ch.xp = Math.max(ch.xp, XP_TABLE[ch.level]); applyLevelUp(ch, autoLevelChoices(ch)); } ch.hp = maxHp(ch); }
 
 // ---------- the DM's memory ----------
 // A rolling "story so far" keeps long campaigns consistent: older log entries are folded into a short summary.
@@ -101,7 +102,7 @@ function styleDirective(){
 "use strict";
 // ======================= "PREVIOUSLY ON…" RECAP =======================
 // Shown when you continue a campaign (or join a friend's game mid-story), so game night starts with everyone caught up.
-function maybeRecap(){ const c = C(); if (!c || c.combat || (c.log || []).filter(e => e.kind === "dm").length < 4) return; setTimeout(() => { if (!S().modal) openModal({ type: "recap" }); }, 350); }
+function maybeRecap(){ if (!window.Net?.isGuest()) store.camp(c => { beginSession(c); if (c.world) ensureFactions(c); }); const c = C(); if (!c || c.combat || (c.log || []).filter(e => e.kind === "dm").length < 4) return; setTimeout(() => { if (!S().modal) openModal({ type: "recap" }); }, 350); }
 function RecapModal(){
   const s = useStore(); const c = s.campaign; const [busy, setBusy] = useState(false); if (!c) return null;
   const st = c.story, v = c.villain, loc = topLoc(c, c.currentLocationId);

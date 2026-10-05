@@ -136,7 +136,7 @@ const MAGIC_ITEMS = [
   [3,{name:"Amulet of Health",type:"amulet",ability_set:{CON:19},rarity:"rare",value:2000,description:"A red gem on a gold chain. Your Constitution becomes 19."}],
   [3,{name:"Belt-Cloak of the Drake",type:"cloak",resist:["fire","cold"],ac_bonus:1,rarity:"very rare",value:3000,description:"Scaled leather that shrugs off flame and frost."}]
 ];
-function lootTier(level){ return level <= 2 ? 0 : level <= 4 ? 1 : level <= 7 ? 2 : 3; }
+function lootTier(level){ return level <= 2 ? 0 : level <= 4 ? 1 : level <= 7 ? 2 : level <= 10 ? 3 : level <= 16 ? 4 : 5; }
 function rollLoot(level, kind="minor"){
   const t = lootTier(level); const out = { gold: 0, items: [] };
   const goldDice = {minor:[`${1+t}d6`,5], chest:[`${2+t}d6`,10], boss:[`${3+t}d6`,15]}[kind] || ["1d6",5];

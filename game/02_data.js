@@ -11,7 +11,7 @@ const ABILS = ["STR","DEX","CON","INT","WIS","CHA"];
 const ABIL_NAME = {STR:"Strength",DEX:"Dexterity",CON:"Constitution",INT:"Intelligence",WIS:"Wisdom",CHA:"Charisma"};
 const SKILLS = {"Acrobatics":"DEX","Animal Handling":"WIS","Arcana":"INT","Athletics":"STR","Deception":"CHA","History":"INT","Insight":"WIS","Intimidation":"CHA","Investigation":"INT","Medicine":"WIS","Nature":"INT","Perception":"WIS","Performance":"CHA","Persuasion":"CHA","Religion":"INT","Sleight of Hand":"DEX","Stealth":"DEX","Survival":"WIS"};
 const XP_TABLE = [0,300,900,2700,6500,14000,23000,34000,48000,64000,85000];
-const MAX_LEVEL = 10;
+const MAX_LEVEL = 20;
 const ALIGNMENTS = ["Lawful Good","Neutral Good","Chaotic Good","Lawful Neutral","True Neutral","Chaotic Neutral","Lawful Evil","Neutral Evil","Chaotic Evil"];
 
 const RACES = {

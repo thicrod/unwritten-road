@@ -194,6 +194,7 @@ function threatSetback(c, notes, days, why){
   notes.push({kind:"quest", text:`${c.villain?.name || "The enemy"}'s plans are delayed (${why})`});
 }
 function liberate(c, loc, notes){
+  tallyOf(c).liberated++;
   if (c.explore?.loc === loc.id) c.explore = null;
   loc.fallen = false; loc.hostile = false; loc.dungeon = null; loc.cleared = false; loc.bossName = null;
   addRep(c, loc.name, 35, notes); threatSetback(c, notes, 6, `${loc.name} liberated`);
@@ -204,7 +205,8 @@ function liberate(c, loc, notes){
 // ---------- 3. Reputation ----------
 function standing(c, town){ return town ? (c.reputation?.[town.name] || 0) : 0; }
 function standingLabel(v){ return v >= 50 ? "Honored" : v >= 20 ? "Liked" : v <= -50 ? "Hated" : v <= -20 ? "Distrusted" : "Neutral"; }
-function priceMult(c, town){ const v = standing(c, town); return v >= 50 ? 0.8 : v >= 20 ? 0.9 : v <= -50 ? 1.5 : v <= -20 ? 1.25 : 1; }
+function priceMult(c, town){ return priceMultBase(c, town) * factionPriceMult(c); }
+function priceMultBase(c, town){ const v = standing(c, town); return v >= 50 ? 0.8 : v >= 20 ? 0.9 : v <= -50 ? 1.5 : v <= -20 ? 1.25 : 1; }
 function addRep(c, name, d, notes){ if (!name || !d) return; c.reputation = {...(c.reputation||{})}; c.reputation[name] = clamp((c.reputation[name]||0) + d, -100, 100); notes?.push({kind: d > 0 ? "loot" : "hurt", text:`Reputation with ${name} ${d > 0 ? "+" : ""}${d}`}); }
 function standingRewards(c, notes){
   for (const l of topLevelLocs(c).filter(l => isSettlement(l))){
@@ -302,7 +304,7 @@ function improvable(c, r){
 }
 async function craft(recipeId, itemId){
   const c0 = C(); const r = RECIPES.find(x => x.id === recipeId); if (!r || !canCraft(c0, r) || S().busy || c0.combat) return;
-  const needs = recipeNeeds(c0, r); const chk = await partyCheck(r.skill, r.dc); const notes = [];
+  const needs = recipeNeeds(c0, r); const chk = await partyCheck(r.skill, r.dc - (hasUp(c0, "forge") ? 2 : 0)); const notes = [];
   store.camp(c => {
     if (!chk.success){ takeMats(c, needs, 0.5); notes.push({kind:"hurt", text:`${r.name}: botched (${chk.who ? firstName(chk.who.name) : "the party"} wasted some materials)`}); }
     else { takeMats(c, needs, 1);
@@ -318,7 +320,7 @@ async function craft(recipeId, itemId){
 async function forage(){
   const c0 = C(); const here = topLoc(c0, c0.currentLocationId); if (!here || isSettlement(here) || c0.explore || S().busy || c0.combat) return;
   if ((here.foragedDay ?? -1) === c0.time.day){ coopNotify("You've already searched this area today.", "bad"); return; }
-  const chk = await partyCheck("Survival", 12); const notes = [];
+  const chk = await partyCheck("Survival", 12 - (factionTier(C(), "wild") >= 1 ? 2 : 0)); const notes = [];
   store.camp(c => { const l = c.locations[here.id]; l.foragedDay = c.time.day; advanceTime(c, 1/6);
     if (chk.success){ const pool = FORAGE[l.biome || "g"] || FORAGE.g; const n = 1 + (chk.total >= 17 ? 2 : chk.total >= 14 ? 1 : 0);
       for (let i=0;i<n;i++){ const nm = pick(pool); addItem(c.characters[c.activeCharId], matItem(nm)); notes.push({kind:"loot", text:`Foraged: ${nm}`}); }

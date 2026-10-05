@@ -135,11 +135,10 @@ function endTurnEffects(c, cb){
     if (cb.sw){ cb.sw.rounds--; if (cb.sw.rounds <= 0){ cb.sw = null; clog(c,"sys",`${ch.name}'s spiritual weapon fades.`); } }
     for (const s of cbList(c).filter(x=>x.summoned && x.owner === cb.id)){ s.rounds--; if (s.rounds <= 0 && !s.fled){ s.fled = true; clog(c,"sys",`${s.name} fades away.`); } }
     // legendary actions happen at the end of a hero's turn
-    for (const e of enemies(c).filter(e => e.legendary && e.legUsed < e.legendary && canAct(c, e))){
-      const tg = reachableFoes(c, e, true); const tgt = tg.length ? pick(tg) : null; if (!tgt) continue;
-      e.legUsed++; const a = e.atk.find(x=>!x.ranged) || e.atk[0];
-      const r = resolveAttack(c, e, tgt, {...a, melee: !a.ranged}); clog(c, "enemy", `Legendary action! ${attackText(e, tgt, a, r)}`);
-      if (checkEndQuiet(c)) return;
+    for (const e of enemies(c).filter(e => e.legendary && e.legUsed < legMax(c, e) && canAct(c, e))){
+      if (!reachableFoes(c, e, true).length) continue;
+      e.legUsed++; legendaryAction(c, e);
+      if (!c.combat || checkEndQuiet(c)) return;
     }
   } else {
     const keep = [];
@@ -202,6 +201,7 @@ function checkEnd(c){
   return false;
 }
 function finishCombat(c, status){
+  try { metaAfterFight(c, status); if ((status === "victory" || status === "surrender") && window.Net?.isOnline() && (Net.room?.players || []).filter(p => p.connected).length >= 2) c.coopWin = true; } catch (e) { console.warn(e); }
   const cm = c.combat; cm.status = status;
   const dead = enemies(c).filter(e=>e.dead), fled = enemies(c).filter(e=>e.fled && !e.dead);
   let xp = dead.reduce((a,e)=>a+e.xp,0) + Math.floor(fled.reduce((a,e)=>a+e.xp,0)/2);
@@ -283,6 +283,7 @@ function hurt(c, cb, amt, t, o={}){
   if (cb.kind === "enemy" && (cb.traits?.regenStop || ["fire","acid"]).includes(t)) cb.noRegen = true;
   cb.hp -= a; fx(c, {k: o.crit ? "crit" : "dmg", to: cb.id, n: a, dt: t});
   for (const x of (cb.conds||[]).filter(x=>x.endsOnDamage)) { remC(c, cb, x.n); defer(c,"sys",`${cb.name} snaps out of it.`); }
+  if (cb.kind === "enemy" && cb.boss && !cb.lastStand && cb.phase2 && cb.hp > 0 && cb.hp <= cb.maxHp/4){ cb.lastStand = true; bossLastStand(c, cb); }
   if (cb.kind === "enemy" && cb.boss && !cb.phase2 && cb.hp > 0 && cb.hp <= cb.maxHp/2 && cb.phase){ cb.phase2 = true; bossPhase(c, cb); }
   if (cb.hp <= 0){
     if (cb.kind === "enemy" && cb.traits?.undeadFortitude && t !== "radiant" && !o.crit){ const r = d(20) + (cb.mods?.CON||0); if (r >= 5 + a){ cb.hp = 1; defer(c,"enemy",`${B(cb.name)} refuses to fall (Undead Fortitude)!`); return a; } }
@@ -434,6 +435,7 @@ function resolveAttack(c, att, tgt, a, o={}){
     if (sm.colossus && !pt.colossus && tgt.hp < tgt.maxHp){ pt.colossus = true; addDmg("1d8", a.t, "colossus slayer"); }
     if (ch.cls === "Cleric" && ch.level >= 8 && !pt.dstrike){ pt.dstrike = true; addDmg("1d8", a.t, "divine strike"); }
     if (pt.smite && a.melee){ const l = lowestSlot(ch, 1); if (l){ ch.slotsUsed[l] = (ch.slotsUsed[l]||0)+1; const dice = Math.min(5, 1 + l) + (["undead","fiend"].includes(tgt.type) ? 1 : 0); addDmg(`${dice}d8`, "radiant", "divine smite"); pt.smite = false; } }
+    if (ch && ch.cls === "Paladin" && ch.level >= 11 && a.melee) addDmg("1d8", "radiant", "improved smite");
     if (pt.branding){ addDmg(pt.branding.dmg, pt.branding.t, "branding smite"); pt.branding = null; }
     if (pt.maneuver && resLeft(ch,"superiority")){ useRes(ch,"superiority"); addDmg("1d8", a.t, "superiority"); pt.maneuver = false; }
   }

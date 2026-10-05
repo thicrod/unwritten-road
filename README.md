@@ -161,6 +161,89 @@ ANTHROPIC_API_KEY=sk-ant-... npm start
 - **Ambient music** (Settings → Music; off by default): synthesized in the browser, following the scene through towns, wilds, dungeons, battles and boss fights, with crossfades and reverb.
 - **Sturdier DM replies:** the parser accepts common variations from smaller models (mangled markers, fenced or whole-object JSON, "Narration:" labels) and repairs replies cut off mid-JSON.
 
+## Progression and extras
+
+- **Levels 1–20:**
+  - Full experience, spell slot and spells-known tables up to level 20.
+  - High-level class features, with ability score increases at 12, 16 and 19.
+  - Fighters get 3 attacks at 11 and 4 at 20, Paladins get Improved Divine Smite, and Barbarians get Primal Champion.
+  - 18 spells of 6th–9th level (Chain Lightning, Heal, Finger of Death, Sunburst, Meteor Swarm, Power Word Kill, Mass Heal…).
+  - Epic monsters (adult dragons, Lich, Vampire, Death Knight, Balor, giants, golems) and very rare and legendary treasure.
+- **Party base:** buy a hall in a friendly town (600 gp). Resting there is free. Upgrades:
+  - **Forge:** +2 to crafting checks.
+  - **Library:** research for clues or XP.
+  - **Chapel:** cures curses and disease when you rest.
+  - **Stables:** free, faster fast travel.
+  - **Training yard:** XP from a day of training.
+  - **Treasury:** daily income.
+- **Fast travel:** safe trips between towns you've visited, with no encounters and a coach fare. It's a party vote in co-op.
+- **Session recap:** leaving with Home after a real session (or Settings → Show recap) shows the night's highlights: XP per hero, MVP, best hit, fights, loot, quests, clues, achievements. Copy it as text, or save it as an image on the website.
+- **Achievements and Hall of Fame:** 30 achievements with unlock pop-ups and progress bars. Every finished campaign enters the Hall of Fame with the hero's portrait, title and stats.
+- **Portuguese interface:** Settings → Interface language → Português translates menus, buttons, combat and settings. It also switches the story to Portuguese, which you can change separately. Spell, item and monster names stay in English.
+
+## Reliability, testing and playtests
+
+- **Model fallback:** if the storyteller model is busy or unavailable (a 503, for example), the server retries on the next lighter model before any text streams, and the player sees a short notice. `npm run check-key` shows a busy model as a warning, not a failure.
+- **Report a problem:** the ⚑ button on any DM reply (or Settings → Report a problem) sends the player's note, the last DM reply and the game details to the server.
+  - Reports are logged as `[report] #id …`, and saved in Postgres or `SAVES_DIR` when configured.
+  - To read them, set `ADMIN_KEY` on the server, then open `/api/reports?key=YOUR_ADMIN_KEY`.
+- **DM check-up** (Settings): sends two real requests through the game's own instructions and grades the replies: story text, the state block, dialogue choices and their tones, teammate lines, and speed. "Send results" files it as a report.
+- **Tests:** `npm test` runs the unit tests, and `npm run test:e2e` runs browser tests (solo, combat, boss fights, factions, reports, co-op) against the mock DM. GitHub Actions runs both on every push (`.github/workflows/ci.yml`).
+- **Faster loading:** the build minifies everything, and the server sends a pre-compressed Brotli page (about 225 KB instead of about 950 KB). `UR_NO_MINIFY=1 npm run build` gives readable output for debugging.
+
+### Real playtest checklist (game night)
+1. Before friends arrive, run **Settings → DM check-up** with your real key, and send the results.
+2. Play 45–60 minutes with 2–4 people: talk to NPCs, fight at least once (a boss if you can), travel, and use voice and the mic.
+3. Whenever something feels off (the story ignores you, repeats, bad choices, a stuck button), tap **⚑** on that reply and say what happened.
+4. Afterwards, send me the `[report]` lines from the Render logs, or `/api/reports`.
+
+## Combat, factions and scenes
+
+- **Epic boss fights:**
+  - Bosses take legendary actions between heroes' turns: 2 per round from party level 5, 3 from level 11. These include a sweeping strike across the front line.
+  - At half health bosses enter phase 2, and at a quarter they make a **last stand** and call minions.
+  - Lair hazards hit every round (every other round below level 8), themed by the boss: flame vents, grasping dead, falling rocks, hellfire, maddening whispers. The battle map shows a boss health bar, phase tags and legendary pips.
+- **Factions:** each campaign has a law faction, a merchants' guild, mages or druids, a thieves' guild, and the villain's cult.
+  - Standing runs from Hated to Honored, and the DM changes it through the story. Defeating bandits and cultists shifts it too.
+  - **Rewards:** Liked and Honored unlock discounts, gifts, a revealed hidden place, a secret about the villain, the druids' blessing, and a sergeant who joins your boss fights.
+  - The Journal shows each faction, and the epilogue tells how each remembers you.
+- **Scene illustrations:** a painted banner for the party's current place, lit by the time of day. Optional AI art: set `SCENE_ART_MODEL` (a Gemini image model your key can use) and each place gets a generated illustration once, shared with everyone and capped by `SCENE_ART_MAX_PER_DAY` (default 20). The built-in banner is the fallback.
+- **Speak your actions:** the 🎤 button next to Send fills the action box from your voice, using the browser's speech recognition (Chrome, Edge or Safari). Start with "say …" to speak in character.
+
+## Dialogue and teammates
+
+- **More choices when talking to people:** when an NPC talks with you or makes an offer, the DM gives 4–5 options. There's one to accept (✓), one to refuse (✕), a probing question (?), a skill play (Persuasion, Deception…), and a 🎲 wildcard. *Say something random* makes your hero blurt out something unexpected, and *Say something else…* lets you type your own line.
+- **Teammates talk:**
+  - **In the story:** AI companions speak in their own voices as chat bubbles under the narration, reacting to the scene, to you and to each other.
+  - **On the road:** they also banter on their own, with no AI request needed.
+  - **In combat:** they shout over their tokens on crits, kills, when an ally goes down, at the start of a fight and on victory. Enemies taunt back.
+- **Combat clarity:** a caption on the battle map says what just happened, badges show who acts next, and fallen fighters topple.
+- **World map:** your party leader's portrait marks where you are, plus a compass rose.
+
+## DM voice (optional): narration read aloud with ElevenLabs
+
+The server can voice the Dungeon Master's narration with ElevenLabs (model `eleven_flash_v2_5`). Only the story text is spoken: dice, system messages, menus and chat are not, and markdown is stripped first.
+
+- **Set it up:** add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` to the server environment (`.env` locally, or Render → Environment), and optionally `ELEVENLABS_MAX_CHARS_PER_MONTH` (9000 suggested on the free tier). The key stays on the server and is never sent to browsers.
+- **How it works:**
+  - The server watches each DM reply. As soon as the narration is complete, it generates the audio once and tells every player in the room to play that same clip, or tells the solo player.
+  - Clips are cached by a hash of the text, so repeats cost nothing.
+  - Every request logs its character count and the monthly total (`[tts] 247 chars · 2026-10 total 247 / 9,000`). The total is saved in Postgres or `SAVES_DIR` when configured, so restarts don't reset it.
+- **Fallback:** if ElevenLabs fails, times out, runs out of quota, or the monthly cap is reached, players hear their browser's built-in voice instead and the server logs why.
+- **For players:** Settings → **DM Voice** turns it on or off for that device only. It's on by default when the server has ElevenLabs set up. A new narration stops the previous one, and the ■ button stops it immediately.
+- **Attribution:** "Voice by ElevenLabs" appears in Settings and while a clip plays, as the free tier requires.
+
+## Cloud saves (optional)
+
+Campaigns normally save in each browser. To let players continue on any device, connect a free Postgres database:
+
+1. Create a free database at **neon.tech** (sign in, create a project) and copy its connection string (`postgresql://…`).
+2. In Render → your service → **Environment**, add `DATABASE_URL` with that string, then redeploy.
+3. The logs say `Cloud saves: ON (postgres)`.
+4. **Using it:** in Settings, each player sees a private save code. Entering the same code on another device brings their campaigns there. Achievements and the Hall of Fame stay on each device.
+
+Without `DATABASE_URL`, cloud saves stay hidden and everything else works as before. For local testing, `SAVES_DIR=./saves npm start` stores cloud saves as files.
+
 ## Site password (recommended once deployed)
 
 Set `SITE_PASSWORD` and everyone sees a sign-in page first:

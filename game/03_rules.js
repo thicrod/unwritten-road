@@ -267,6 +267,7 @@ const rageBonus = ch => ch.level >= 9 ? 3 : 2;
 function attacksPerAction(ch){
   let n = 1; const sm = subMods(ch);
   if (["Fighter","Barbarian","Paladin","Ranger","Monk"].includes(ch.cls) && ch.level >= 5) n = 2;
+  if (ch.cls === "Fighter" && ch.level >= 11) n = ch.level >= 20 ? 4 : 3;
   if (ch.cls==="Bard" && sm.valor && ch.level >= 6) n = 2;
   if (hasCond(ch,"hasted")) n += 1;
   return n;
@@ -398,6 +399,7 @@ function applyLevelUp(ch, ch2){ // ch2 = choices
   if (ch2.asi){ if (ch2.asi.feat){ ch.feats.push(ch2.asi.feat); if (ch2.asi.feat==="Resilient (CON)") ch.abilities.CON = Math.min(20, ch.abilities.CON+1); }
     else for (const [k,v] of Object.entries(ch2.asi.inc||{})) ch.abilities[k] = Math.min(20, ch.abilities[k] + v); }
   if (ch2.subclass) ch.subclass = ch2.subclass;
+  if (ch.cls === "Barbarian" && plan.level === 20){ ch.abilities.STR = Math.min(24, ch.abilities.STR + 4); ch.abilities.CON = Math.min(24, ch.abilities.CON + 4); }
   if (ch2.cantrips) ch.cantrips.push(...ch2.cantrips);
   if (ch2.spells) ch.spells.push(...ch2.spells);
   if (ch2.swapOut && ch2.swapIn){ ch.spells = ch.spells.filter(s=>s!==ch2.swapOut); ch.spells.push(ch2.swapIn); }

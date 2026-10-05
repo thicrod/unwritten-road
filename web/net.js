@@ -14,7 +14,7 @@
     CALLS: { enterDungeon: "map", moveToRoom: null, leaveDungeon: null, searchRoom: null, restInDungeon: null, engageRoom: null, craft: null, forage: null,
       openShop: "shop", shopBuy: null, shopSell: null, castOutOfCombat: "close", useItemOutOfCombat: "close", doShortRest: "close",
       innRest: "close", innRumors: "close", recruitAt: "close", templeHeal: null, templeCure: null, templeRaise: "close", refreshBoard: null, takeBounty: null,
-      gearEquip: null, gearUnequip: null, gearGive: null, gearDrop: null, partySet: null, applyUpgrade: null, applyHeroLevelUp: "close" },
+      gearEquip: null, gearUnequip: null, gearGive: null, gearDrop: null, partySet: null, applyUpgrade: null, applyHeroLevelUp: "close", buyBase: null, buyUpgrade: null, baseRest: "close", baseStudy: null, baseTrain: null, baseCollect: null },
     lastSnap: null, lastRef: null, timer: null, busyTimer: null, lastBusy: null, lastStream: null, inited: false,
     isOnline() { return !!this.room; },
     isHost() { return !!this.room && this.room.hostId === me.id; },
@@ -108,6 +108,7 @@
       s.on("ui:overlay", (o) => { if (this.isGuest()) this.orig.showRoll?.(o); });
       s.on("ui:journey", (j) => { if (this.isGuest()) this.orig.playJourney?.(j); });
       s.on("ui:busy", (b) => { if (this.isGuest()) store.set({ busy: b.busy, stream: b.stream || "" }); });
+      s.on("voice:play", (v) => { try { window.DMVoice?.play(v); } catch {} });
       s.on("intent", ({ from, intent }) => { if (this.isHost()) { try { Coop.handle(from, intent); } catch (e) { console.warn("intent failed", e); } } });
       s.on("chat", (m) => { const open = S().chatOpen; store.set({ chat: [...(S().chat || []), m].slice(-60), chatUnread: open || m.pid === me.id ? 0 : (S().chatUnread || 0) + 1 }); if (!open && m.pid !== me.id) toast(`💬 ${m.name}: ${m.text.slice(0, 80)}`); });
       return s;
