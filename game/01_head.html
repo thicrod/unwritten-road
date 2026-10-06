@@ -1015,6 +1015,36 @@ button.chip:disabled{ opacity:.45; cursor:not-allowed; }
 .twinkle{ animation:twk 3s ease-in-out infinite; } @keyframes twk{ 0%,100%{ opacity:.25 } 50%{ opacity:1 } }
 @media (max-width:700px){ .scene-banner{ height:96px; } .scene-cap b{ font-size:16px; } }
 @media (prefers-reduced-motion: reduce){ .twinkle{ animation:none; } }
+
+/* ---- sites (floor plans) and towns ---- */
+.map-frame svg.site-map{ background:#1a1612; touch-action:manipulation; }
+.map-frame svg.town-map{ background:radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.35), transparent 60%), #e3cf9f; }
+.map-frame.dark .map-title.dark{ color:#efe0bb; text-shadow:0 0 4px #1a1612, 0 0 8px #1a1612; }
+.map-frame.dark .seg button{ background:rgba(255,255,255,.14); color:#efe0bb; }
+.map-frame.dark .seg button.on{ background:#efe0bb; color:#2a1f15; }
+.site-map .sroom{ outline:none; }
+.site-map .sroom.can{ cursor:pointer; }
+.site-map .sroom.can:hover > rect:first-of-type{ filter:brightness(1.15); }
+.site-map .sroom:focus-visible > rect:first-of-type{ stroke:var(--ember); }
+.site-map .can-ring{ animation:canring 1.6s ease-in-out infinite; }
+@keyframes canring{ 50%{ opacity:.35; } }
+.site-map .sobj.act, .site-map .snpc{ cursor:pointer; }
+.site-map .sobj.act:hover, .site-map .snpc:hover{ filter:brightness(1.2) drop-shadow(0 0 3px rgba(230,189,85,.8)); }
+.site-map .party-token, .town-map .party-token{ transition:transform .6s cubic-bezier(.2,.7,.2,1); }
+.site-map .party-pulse, .town-map .party-pulse{ animation:halo 2.2s ease-in-out infinite; transform-origin:center; transform-box:fill-box; }
+.town-map .tbuild, .town-map .tfeat{ cursor:pointer; outline:none; }
+.town-map .tbuild:hover > rect:nth-of-type(2), .town-map .tbuild.here > rect:nth-of-type(2){ filter:brightness(1.12); }
+.town-map .tbuild:focus-visible rect{ stroke:var(--ember-deep); }
+.site-panel{ display:flex; flex-direction:column; gap:6px; }
+.site-panel .floor-tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.site-panel .site-sel{ padding:8px 10px; border-radius:8px; background:rgba(255,255,255,.28); border:1px solid rgba(90,60,25,.35); font-size:14px; }
+.site-panel .chip.can{ border-color:var(--ember-deep); color:var(--ink); background:rgba(224,138,60,.18); }
+.site-panel .chip.good{ border-color:var(--witch-deep); }
+.site-panel .site-last{ margin-top:8px; padding:8px 10px; border-left:3px solid var(--ember-deep); background:rgba(255,255,255,.22); border-radius:0 8px 8px 0; }
+.site-panel .site-last-text{ font-family:var(--f-body); font-size:14px; line-height:1.4; color:var(--ink); }
+.placebar.site{ background:linear-gradient(90deg,rgba(224,138,60,.18),transparent); }
+.battlefield .bt-room{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%); font-size:11.5px; padding:2px 10px; border-radius:999px; background:rgba(0,0,0,.45); color:#efe0bb; pointer-events:none; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:1000px){ .map-frame:has(svg.site-map), .map-frame:has(svg.town-map){ aspect-ratio:auto; height:auto; max-height:70vh; } .map-frame svg.site-map, .map-frame svg.town-map{ max-height:70vh; } .map-frame .map-title.dark{ display:none; } .map-frame:has(svg.town-map) .map-title{ top:auto; bottom:8px; } }
 </style>
 </head>
 <body>

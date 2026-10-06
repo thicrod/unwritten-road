@@ -61,35 +61,18 @@ function RegionMap({ c, sel, onSel, route, vb, handlers, dragging }){
       </g>`; })}</g>
   </svg>`;
 }
-const ROOM_ICON = { entrance:"road", combat:"swords", boss:"skull", trap:"bolt", treasure:"gem", mystery:"eye", camp:"camp", shrine:"temple" };
-function DungeonMap({ c }){
-  const d = dungeonOf(c); const loc = c.locations[c.explore.loc]; const cur = roomOf(c); const busy = !!S().busy || !!c.combat;
-  const W = 5, H = 3, CW = 90, CH = 80, RW = 64, RH = 50;
-  const pos = r => [r.x*CW + (CW-RW)/2 + 10, r.y*CH + (CH-RH)/2 + 10];
-  const shown = r => r.state !== "unseen";
-  const reachable = new Set(roomBlocked(cur) ? [] : roomLinks(cur));
-  const edges = []; const seenE = new Set();
-  for (const r of d.rooms) for (const id of [...r.links, ...(r.found||[]).filter(x => r.hiddenLinks.includes(x))]){ const o = d.rooms.find(x=>x.id===id); const k = [r.id,id].sort().join("|"); if (seenE.has(k) || !o || !shown(r) || !shown(o)) continue; seenE.add(k); const secret = r.hiddenLinks.includes(id); const [ax,ay] = pos(r), [bx,by] = pos(o); edges.push(html`<line key=${k} x1=${ax+RW/2} y1=${ay+RH/2} x2=${bx+RW/2} y2=${by+RH/2} stroke=${secret ? "#8b1e16" : "#6b5436"} strokeWidth=${secret ? 3 : 7} strokeDasharray=${secret ? "4 3" : ""} strokeLinecap="round" opacity=${secret ? .9 : .5}/>`); }
-  return html`<svg viewBox=${`0 0 ${W*CW+20} ${H*CH+20}`} className="map dungeon-map" role="img" aria-label=${`Map of ${loc.name}`}>
-    <rect x="0" y="0" width=${W*CW+20} height=${H*CH+20} fill="#2c231b"/>
-    ${edges}
-    ${d.rooms.filter(shown).map(r => { const [x,y] = pos(r); const isCur = r.id === cur.id; const can = reachable.has(r.id); const known = r.state === "visited" || r.state === "cleared";
-      return html`<g key=${r.id} className=${"droom" + (isCur ? " cur" : "") + (can ? " can" : "")} transform=${`translate(${x} ${y})`} onClick=${()=> can && !busy ? moveToRoom(r.id) : null} role=${can ? "button" : undefined} tabIndex=${can ? 0 : undefined} onKeyDown=${e=>{ if (e.key==="Enter" && can && !busy) moveToRoom(r.id); }} aria-label=${known ? r.name : "Unexplored room"}>
-        <rect width=${RW} height=${RH} rx="6" fill=${known ? (r.type === "boss" ? "#5a2a22" : r.state === "cleared" ? "#3f4a3a" : "#4a3b2c") : "#3a3026"} stroke=${isCur ? "#e6bd55" : can ? "#e08a3c" : "#6b5436"} strokeWidth=${isCur ? 2.5 : can ? 2 : 1.2} strokeDasharray=${known ? "" : "4 3"}/>
-        ${known ? html`<g transform=${`translate(${RW/2-9} 8) scale(.75)`} stroke=${r.type === "boss" ? "#ff9a8a" : "#e8d9b8"} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">${(ICONS[ROOM_ICON[r.type]]||ICONS.unknown).map((p,i)=>html`<path key=${i} d=${p}/>`)}</g>` : html`<text x=${RW/2} y="27" textAnchor="middle" fontSize="16" fill="#b39a74" fontFamily="Alegreya, serif">?</text>`}
-        <text x=${RW/2} y=${RH-8} textAnchor="middle" fontSize="7.5" fill="#efe0bb" fontFamily="Alegreya SC, serif">${known ? r.name.slice(0,18) : ""}</text>
-      </g>`; })}
-    ${(() => { const [tx, ty] = pos(cur); return html`<g className="dtoken" style=${{transform:`translate(${tx + RW - 9}px, ${ty + 9}px)`}}><circle r="7" fill="rgba(230,189,85,.25)"/><circle r="4.5" fill="#e6bd55" stroke="#2c231b" strokeWidth="1"/></g>`; })()}
-  </svg>`;
-}
 function MapView(){
   const s = useStore(); const c = s.campaign;
-  const [sel, setSelState] = useState(s.mapSel || null); const [mode, setMode] = useState(c.explore ? "dungeon" : "world");
+  const town0 = townOf(c);
+  const [sel, setSelState] = useState(s.mapSel || null); const [mode, setMode] = useState(c.explore ? "site" : town0 ? "town" : "world");
+  const [floorId, setFloor] = useState(null); const [siteSel, setSiteSel] = useState(null); const [townSel, setTownSel] = useState(null);
+  useEffect(() => { if (c.explore) setMode("site"); else if (townOf(C())) setMode("town"); else setMode("world"); }, [!!c.explore, c.explore?.loc, town0?.id]);
+  useEffect(() => { setFloor(null); setSiteSel(null); }, [c.explore?.loc, dungeonOf(c)?.current]);
+  useEffect(() => { const t = townOf(C()); if (t && (!t.town || t.town.v !== TOWN_V) && !window.Net?.isGuest()) store.camp(cc => { ensureTown(cc, townOf(cc)); }); }, [town0?.id, mode]);
   const frameRef = useRef(null); const [size, setSize] = useState({w: 640, h: 460}); const [zoom, setZoom] = useState(null);
   const drag = useRef(null); const moved = useRef(false); const [dragging, setDragging] = useState(false);
   useEffect(() => { const el = frameRef.current; if (!el || typeof ResizeObserver === "undefined") return; const ro = new ResizeObserver(([e]) => { const r = e.contentRect; if (r.width > 50 && r.height > 50) setSize({w: r.width, h: r.height}); }); ro.observe(el); return () => ro.disconnect(); }, []);
   useEffect(() => { if (s.mapSel){ setSelState(s.mapSel); const l = c.locations[s.mapSel]; if (l?.gx != null) setZoom(z => ({cx: l.gx*10+5, cy: l.gy*10+5, w: (z?.w) || 220})); store.set({mapSel:null}); } }, [s.mapSel]);
-  useEffect(() => { if (c.explore) setMode("dungeon"); else setMode("world"); }, [!!c.explore]);
   if (!c.world?.map) return html`<div className="page"><p className="muted">The map is still being drawn…</p></div>`;
   const setSel = id => { if (moved.current) return; setSelState(id); };
   const aspect = size.w / size.h; const fit = fitView(c, aspect); const v = zoom || fit; const vh = v.w / aspect;
@@ -111,29 +94,27 @@ function MapView(){
   const npcsHere = selLoc ? Object.values(c.npcs).filter(n => n.location === selLoc.id || children.some(ch => ch.id === n.location)) : [];
   const quests = selLoc ? Object.values(c.quests).filter(q => q.status === "active" && (q.auto?.loc === selLoc.id || (q.kind === "main" && c.villain?.lair === selLoc.id))) : [];
   const isHere = selLoc && here && selLoc.id === here.id;
-  const d = dungeonOf(c); const room = d && roomOf(c);
+  const d = dungeonOf(c); const site = d && d.v >= SITE_V ? d : null; const room = site && roomOf(c);
+  const townHere = townOf(c); const townReady = townHere?.town?.v === TOWN_V;
+  const showSite = mode === "site" && site && room; const showTown = mode === "town" && townHere && !showSite;
+  const modes = [...(site ? [["site", "Inside"]] : []), ...(townHere ? [["town", "Town"]] : []), ["world", "World"]];
   return html`<div className="mapwrap">
-    <div className=${"map-frame parch" + (mode === "dungeon" && d ? " dark" : "")} ref=${frameRef}>
-      ${c.explore && html`<div className="map-toggle"><${Seg} value=${mode} options=${[["dungeon","Dungeon"],["world","World"]]} onChange=${setMode}/></div>`}
-      ${mode === "dungeon" && d ? html`<${DungeonMap} c=${c}/>` : html`<${RegionMap} c=${c} sel=${selLoc?.id} onSel=${setSel} route=${route} vb=${vb} handlers=${handlers} dragging=${dragging}/>`}
-      ${!(mode === "dungeon" && d) && html`<svg className="compass" viewBox="-50 -50 100 100" aria-hidden="true"><circle r="44" fill="rgba(244,232,205,.55)" stroke="#6a4f2a" strokeWidth="1.5"/><circle r="36" fill="none" stroke="#6a4f2a" strokeWidth=".8" strokeDasharray="2 3"/>
+    <div className=${"map-frame parch" + (showSite ? " dark" : "")} ref=${frameRef}>
+      ${modes.length > 1 && html`<div className="map-toggle"><${Seg} value=${showSite ? "site" : showTown ? "town" : "world"} options=${modes} onChange=${setMode}/></div>`}
+      ${showSite ? html`<${SiteMap} c=${c} floorId=${floorId} sel=${siteSel} onSel=${setSiteSel} onRoom=${(id) => moveToRoom(id)}/>`
+        : showTown ? (townReady ? html`<${TownMap} c=${c} town=${townHere} sel=${townSel} onSel=${setTownSel}/>` : html`<div className="page"><p className="muted">The streets of ${townHere.name} are being drawn…</p></div>`)
+        : html`<${RegionMap} c=${c} sel=${selLoc?.id} onSel=${setSel} route=${route} vb=${vb} handlers=${handlers} dragging=${dragging}/>`}
+      ${!showSite && !showTown && html`<svg className="compass" viewBox="-50 -50 100 100" aria-hidden="true"><circle r="44" fill="rgba(244,232,205,.55)" stroke="#6a4f2a" strokeWidth="1.5"/><circle r="36" fill="none" stroke="#6a4f2a" strokeWidth=".8" strokeDasharray="2 3"/>
         <path d="M0 -40 L7 0 L0 40 L-7 0 Z" fill="#3a2a1a"/><path d="M0 -40 L7 0 L0 0 Z" fill="#b2372d"/><path d="M-40 0 L0 -6 L40 0 L0 6 Z" fill="#6a4f2a"/><path d="M-26 -26 L3 -3 L26 26 L-3 3 Z" fill="#8a6a3a" opacity=".55"/><path d="M26 -26 L3 3 L-26 26 L-3 -3 Z" fill="#8a6a3a" opacity=".55"/><circle r="4" fill="#f4e8cd" stroke="#3a2a1a"/>
         <text y="-44" textAnchor="middle" fontSize="11" fontWeight="800" fill="#3a2a1a" fontFamily="Georgia, serif" dy="-1">N</text></svg>`}
-      ${!(mode === "dungeon" && d) && html`<div className="map-zoom"><button onClick=${()=>zoomBy(1/1.35)} aria-label="Zoom in">+</button><button onClick=${()=>zoomBy(1.35)} aria-label="Zoom out">−</button><button className="fit" onClick=${()=>setZoom(null)} aria-label="Fit explored area">FIT</button></div>
+      ${!showSite && !showTown && html`<div className="map-zoom"><button onClick=${()=>zoomBy(1/1.35)} aria-label="Zoom in">+</button><button onClick=${()=>zoomBy(1.35)} aria-label="Zoom out">−</button><button className="fit" onClick=${()=>setZoom(null)} aria-label="Fit explored area">FIT</button></div>
         <div className="map-title"><b>${c.world.name}</b>${c.world.region && html`<span>${c.world.region}</span>`}</div>`}
+      ${showSite && html`<div className="map-title dark"><b>${c.locations[c.explore.loc].name}</b><span>${(site.floors.find(f => f.id === (floorId || room.floorId)) || {}).name || ""}</span></div>`}
+      ${showTown && townReady && html`<div className="map-title"><b>${townHere.name}</b><span>${cap(townHere.type)}</span></div>`}
     </div>
     <aside className="map-side parch">
-      ${mode === "dungeon" && d ? html`<div>
-        <h2 style=${{margin:0}}>${c.locations[c.explore.loc].name}</h2><div className="faint" style=${{fontSize:13}}>${cap(THEMES[d.theme].label)}${d.cleared ? " · conquered" : ""}</div>
-        <h3 className="panel-title" style=${{marginTop:12}}>${room.name}</h3>
-        <p className="muted" style=${{marginTop:0}}>${({entrance:"The way in (and out).", combat: room.state==="cleared" ? "The fight here is over." : "Enemies lurk here.", boss: room.state==="cleared" ? "The master of this place has fallen." : "The master of this place waits here.", trap:"A trapped chamber.", treasure:"A treasure chamber.", mystery:`It holds ${room.feature}.`, camp:"A quiet, defensible spot: safe to rest.", shrine:"An old shrine."})[room.type]}</p>
-        <div className="col">${roomBlocked(room) && !c.combat && html`<button className="btn danger" disabled=${!!s.busy} onClick=${engageRoom}><${Icon} n="swords" size=${16}/> Fight!</button>`}
-          <button className="btn sm" disabled=${busy || room.searched || roomBlocked(room)} onClick=${searchRoom}>${room.searched ? "Already searched" : "Search the room (Investigation)"}</button>
-          <button className="btn sm ghost" disabled=${busy || roomBlocked(room)} onClick=${restInDungeon}>Short rest${room.type === "camp" ? " (safe)" : " (risky)"}</button>
-          ${!roomBlocked(room) && html`<button className="btn sm ghost" disabled=${busy} onClick=${leaveDungeon}>${room.type === "entrance" ? "Leave the dungeon" : "Retrace your steps and leave"}</button>`}</div>
-        <p className="faint" style=${{fontSize:12.5}}>Click a glowing room next to you to move. Searching can reveal secret passages.</p>
-        <div className="legend">${Object.entries(ROOM_ICON).map(([k,ic])=>html`<span key=${k}><${Icon} n=${ic} size=${14}/> ${k}</span>`)}</div>
-      </div>`
+      ${showSite ? html`<${SitePanel} c=${c} floorId=${floorId || room.floorId} setFloor=${setFloor} sel=${siteSel} setSel=${setSiteSel}/>`
+      : showTown && townReady ? html`<${TownPanel} c=${c} town=${townHere} sel=${townSel} setSel=${setTownSel}/>`
       : selLoc ? html`<div>
         <div className="row" style=${{gap:10}}><div className="loc-ico"><${Icon} n=${selLoc.type}/></div><div className="grow"><h2 style=${{margin:0}}>${selLoc.name}</h2><div className="faint" style=${{fontSize:13}}>${cap(selLoc.type)}${selLoc.biome ? ` in the ${BIOMES[selLoc.biome]?.n}` : ""}${selLoc.discovered ? (selLoc.visited ? " · visited" : "") : " · rumored"}${isHere ? " · you are here" : ""}${selLoc.cleared ? " · conquered" : ""}</div></div></div>
         <p>${selLoc.discovered ? (selLoc.description || "Little is known of this place.") : "You've only heard rumors of this place."}</p>
@@ -146,10 +127,12 @@ function MapView(){
         ${!isHere && html`<button className="btn primary" disabled=${!!s.busy || !!c.combat || !!c.pendingRoll || !!c.coop?.vote} onClick=${()=>travelTo(selLoc.id)}><${Icon} n="road" size=${18}/> Travel here</button>`}
         ${isHere && isSettlement(selLoc) && html`<div className="col" style=${{marginTop:6}}>${servicesOf(selLoc).map(sv => html`<button key=${sv} className="btn sm ghost" disabled=${busy} onClick=${()=>{ store.set({tab:"adventure"}); ["market","smith"].includes(sv) ? openShop(selLoc.id, sv) : openModal({type:"service", svc: sv, town: selLoc.id}); }}><${Icon} n=${SERVICE_INFO[sv].icon} size=${15}/> ${SERVICE_INFO[sv].label}</button>`)}</div>`}
         ${isHere && isDelvable(selLoc) && html`<button className="btn danger" style=${{marginTop:6}} disabled=${busy} onClick=${()=>enterDungeon(selLoc.id)}><${Icon} n="dungeon" size=${18}/> ${selLoc.dungeon ? "Delve inside" : "Explore inside"}</button>`}
-        ${children.length > 0 && html`<h3 className="panel-title" style=${{marginTop:12}}>Places within</h3>${children.map(p=>html`<div key=${p.id} className="res-row"><span><${Icon} n=${p.type} size=${16}/> ${p.name}${c.currentLocationId===p.id?" (here)":""}</span>${c.currentLocationId!==p.id && isHere && html`<button className="btn ghost sm" disabled=${busy} onClick=${()=>{ store.set({tab:"adventure"}); runDM("action",{text:`We head to ${p.name}.`}); }}>Go</button>`}</div>`)}`}
+        ${isHere && !isDelvable(selLoc) && isEnterable(selLoc) && html`<button className="btn" style=${{marginTop:6}} disabled=${busy} onClick=${()=>enterSite(selLoc.id)}><${Icon} n=${selLoc.type} size=${18}/> Go inside</button>`}
+        ${isHere && isSettlement(selLoc) && html`<button className="btn" style=${{marginTop:6}} onClick=${()=>setMode("town")}><${Icon} n="town" size=${18}/> Walk the streets</button>`}
+        ${children.length > 0 && html`<h3 className="panel-title" style=${{marginTop:12}}>Places within</h3>${children.map(p=>html`<div key=${p.id} className="res-row"><span><${Icon} n=${p.type} size=${16}/> ${p.name}${c.currentLocationId===p.id?" (here)":""}</span>${c.currentLocationId!==p.id && isHere && html`<button className="btn ghost sm" disabled=${busy} onClick=${()=>enterSite(p.id)}>Go</button>`}</div>`)}`}
         ${npcsHere.length > 0 && html`<h3 className="panel-title" style=${{marginTop:12}}>People</h3>${npcsHere.map(n=>html`<div key=${n.id} className="res-row"><span>${n.name}</span><span className="faint">${n.role||""}</span></div>`)}`}
       </div>` : html`<p className="muted">Explore to fill in the map.</p>`}
-      ${mode === "world" && html`<div><h3 className="panel-title" style=${{marginTop:14}}>Known places</h3>
+      ${!showSite && !showTown && html`<div><h3 className="panel-title" style=${{marginTop:14}}>Known places</h3>
         <div className="loc-list">${topLevelLocs(c).filter(l => !l.hidden && l.gx != null).map(l=>html`<button key=${l.id} className=${"chip" + (selLoc?.id===l.id?" gold":"")} onClick=${()=>setSel(l.id)}>${l.discovered?"":"? "}${l.name}</button>`)}</div>
         <div className="legend" style=${{marginTop:10}}>${["g","f","h","m","s","w"].map(b=>html`<span key=${b}><i style=${{background: BIOMES[b].col}}></i>${BIOMES[b].n}</span>`)}<span><b style=${{color:"#b8621f"}}>!</b> quest</span></div></div>`}
     </aside>

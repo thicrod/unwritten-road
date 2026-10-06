@@ -112,10 +112,11 @@ function startCombat(spec, o={}){
     }
     const order = Object.values(cbt).sort((a,b)=> b.init - a.init || (a.side==="party"?-1:1)).map(x=>x.id);
     c.combat = { id: uid("f"), round:1, turn:-1, order, cbt, log:[], status:"active", pt:{}, zones:[], terrain: String(spec.terrain||"").slice(0,120), xp:0, kills:[], focus:null,
-      origin: o.origin || spec.origin || null, sandbox: !!o.sandbox, snapshot: o.sandbox ? structuredClone(c.characters) : null, bossName: foes.find(f=>f.boss)?.name || null };    c.combat.theme = spec.theme || null; setupTactics(c, spec);
+      origin: o.origin || spec.origin || null, sandbox: !!o.sandbox, snapshot: o.sandbox ? structuredClone(c.characters) : null, bossName: foes.find(f=>f.boss)?.name || null };    c.combat.theme = spec.theme || null; c.combat.room = spec.room && typeof spec.room === "object" ? spec.room : null; setupTactics(c, spec);
     c.pendingRoll = null;
     clog(c, "sys", `Battle begins${c.combat.terrain?` (${c.combat.terrain})`:""}! Initiative: ${order.map(id=>`${cbt[id].name} ${cbt[id].init}`).join(", ")}.`);
     if (surprise !== "none") clog(c, "sys", surprise === "enemies" ? "Your foes are caught by surprise!" : "The party is caught by surprise!");
+    if (c.combat.room) clog(c, "sys", roomBattleNote(c.combat.room));
     const boss = foes.find(f => f.boss); if (boss) clog(c, "enemy", `${B(boss.name)} is a formidable foe${boss.legendary ? ` (legendary actions: ${boss.legendary} per round)` : ""}.`);
     for (const ch of members) partyBark(c, ch, "start", 0.35);
     pushLog(c, {kind:"sys", notes:[{kind:"hurt", text:`Combat: ${foes.map(f=>f.name).join(", ")}`}]});
@@ -398,6 +399,7 @@ function resolveAttack(c, att, tgt, a, o={}){
   if (ch && hasCond(ch,"inspired")){ const die = (ch.conditions.find(x=>x.name==="inspired")?.die)||6; const b = d(die); toHit += b; extra.push(`inspiration ${b}`); remCond(ch,"inspired"); }
   if (!ch && hasC(c, att, "inspired")){ toHit += d(6); remC(c, att, "inspired"); }
   if (ch && o.power) toHit -= 5;
+  if (c.combat?.room?.high && att.side === "party" && (a.ranged || (a.spell && !a.melee))){ toHit += 1; extra.push("high ground +1"); }
   const critOn = ch && !a.spell ? (subMods(ch).critRange || 20) : 20;
   const nat = r.kept; let total = nat + toHit; let ac = acOf(c, tgt) + coverBonus(c, att, tgt, a);
   let hit = nat !== 1 && (nat >= critOn || total >= ac); let crit = hit && nat >= critOn;
@@ -522,6 +524,7 @@ function enemyTurn(c, e, plan){
   if (act.do === "dodge"){ addC(c, e, "dodging", {rounds:1}); clog(c, "enemy", `${line}${B(e.name)} takes a defensive stance.`); return; }
   let tgt = c.combat.cbt[act.target] || party(c).find(p=>isUp(c,p)); if (!tgt) return;
   if (act.do === "ability"){ const ab = e.abil.find(a => a.n === act.use); if (ab){ enemyAbility(c, e, ab, tgt, line); return; } }
+  if (c.combat.room?.choke && !e.atk.some(a => a.ranged) && !(e.abil||[]).length){ const cm = c.combat; cm.chokeUsed = cm.chokeUsed || 0; if (cm.chokeUsed >= 2){ clog(c, "enemy", `${line}${B(e.name)} jostles in the doorway, unable to reach the fight.`); return; } cm.chokeUsed++; }
   const pickAtk = (name, t) => { const reach = canReach(c, e, t, true); const named = e.atk.find(a => a.name.toLowerCase() === String(name||"").toLowerCase()); if (named && (named.ranged || reach)) return named; return reach ? (e.atk.find(a=>!a.ranged) || e.atk[0]) : (e.atk.find(a=>a.ranged) || null); };
   // retarget if the chosen hero can't be reached in melee and we have no ranged option
   if (!pickAtk(act.use, tgt)){ const alt = reachableFoes(c, e, true); if (alt.length) tgt = alt[rnd(alt.length)]; }
@@ -868,9 +871,9 @@ function doRunAway(c){
   const ch = actorCh(c), me = actorCb(c), cm = c.combat, pt = cm.pt; if (!ch) return {error:"Not a hero's turn."};
   const free = pt.disengaged || hasCond(ch,"misty");
   if (!free){ for (const e of enemies(c).filter(e => canAct(c, e) && e.pos === "front").slice(0,3)){ const a = e.atk.find(x=>!x.ranged) || e.atk[0]; const r = resolveAttack(c, e, me, {...a, melee:true}); clog(c,"enemy",`Parting blow! ${attackText(e, me, a, r)}`); if (ch.hp <= 0) return {}; } }
-  const foes = enemies(c).filter(e => canAct(c, e)).length; const dc = 8 + 2*foes;
+  const foes = enemies(c).filter(e => canAct(c, e)).length; const dc = 8 + 2*foes - (cm.room?.escape ? 4 : 0);
   const sk = skillMod(ch,"Athletics") >= skillMod(ch,"Acrobatics") ? "Athletics" : "Acrobatics";
-  const r = free ? {kept: 20} : rollD20({adv: pt.dashed}); const tot = r.kept + skillMod(ch, sk);
+  const r = free ? {kept: 20} : rollD20({adv: pt.dashed || !!cm.room?.escape}); const tot = r.kept + skillMod(ch, sk);
   if (free || tot >= dc){ clog(c,"party",`${B(ch.name)} breaks away and the party retreats${free?"":` (${sk} ${tot} vs DC ${dc})`}!`); finishCombat(c, "fled"); }
   else { pt.action = 0; clog(c,"party",`${B(ch.name)} tries to pull the party out but is cut off (${sk} ${tot} vs DC ${dc}).`); return {endTurn:true}; }
   return {};

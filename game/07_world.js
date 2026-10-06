@@ -351,6 +351,7 @@ function startPendingLair(){
 }
 function onArrive(c, loc, notes){
   loc.visited = true; loc.discovered = true; loc.hidden = false;
+  if (isSettlement(loc)) { try { ensureTown(c, loc); } catch (e) { console.warn("town", e); } }
   for (const q of Object.values(c.quests).filter(q => q.status === "active" && q.auto)){
     const a = q.auto;
     if (a.kind === "deliver" && a.loc === loc.id){ const main = c.characters[c.activeCharId]; removeItemByName(main, a.item); completeQuest(c, q, notes); }
@@ -392,154 +393,13 @@ async function resolveEvent(idx){
   if (eff.shop && C().shop) openModal({type:"shop"});
 }
 
-// ---- dungeons ----
-const ROOM_NAMES = {
-  undead:["Ossuary","Collapsed Chapel","Embalming Hall","Hall of Niches","Flooded Tomb","Bone Gallery","Mourners' Walk"],
-  goblin:["Guard Post","Stinking Den","Cookpot Cave","Wolf Pens","Loot Pile","Trash Pit","Chieftain's Approach"],
-  bandit:["Watch Room","Barracks","Stolen Goods Store","Mess Hall","Gambling Den","Armory","Captain's Quarters"],
-  cult:["Robing Room","Chamber of Whispers","Sacrificial Pit","Candle Hall","Scriptorium","Blood Font","Inner Sanctum"],
-  beast:["Bone-strewn Den","Web-choked Tunnel","Nesting Chamber","Dripping Grotto","Gnawed Hall","Fungus Cavern"],
-  swamp:["Sunken Hall","Reed-choked Chamber","Leech Pool","Rotting Shrine","Drowned Stair","Moss Grotto"],
-  giant:["Feasting Hall","Trophy Room","Great Stair","Smashed Armory","Slave Pens","War Room"],
-  dragon:["Kobold Warren","Scorched Hall","Tribute Chamber","Egg Chamber","Molten Gallery","Hoard Approach"],
-  generic:["Entry Hall","Storeroom","Collapsed Hall","Well Chamber","Pillared Hall","Library","Pit Room","Altar Room"]
-};
+// ---- dungeons & other explorable places: see 28_sites.js (generation) and 29_sites_play.js (play) ----
 const MYSTERIES = ["an altar with a riddle carved into its base","a flooded pool with something glinting at the bottom","a wall of faded murals telling this place's history","an iron door with three rotating stone dials","a collapsed library with a few intact books","a statue whose outstretched hand is empty","a circle of runes that hums when approached","a chained chest that whispers"];
 const TRAPS = [{k:"pit", n:"a hidden pit", save:"DEX", t:"bludgeoning"},{k:"darts", n:"poison darts", save:"DEX", t:"poison"},{k:"gas", n:"a cloud of choking gas", save:"CON", t:"poison", all:true},{k:"blade", n:"a scything blade", save:"DEX", t:"slashing"},{k:"runes", n:"exploding glyphs", save:"DEX", t:"fire", all:true},{k:"ceiling", n:"a collapsing ceiling", save:"DEX", t:"bludgeoning", all:true}];
-function genDungeon(c, loc){
-  const theme = themeForLoc(loc); loc.theme = theme; const rng = mulberry(hashStr(loc.id + c.id));
-  const members = partyMembers(c); const L = placeLevel(c, loc); const tier = Math.min(3, lootTier(L));
-  const size = loc.small ? 5 + Math.floor(rng()*2) : 6 + Math.floor(rng()*3) + (loc.important ? 1 : 0);
-  const GW = 5, GH = 3; const grid = {}; const rooms = [];
-  const addRoom = (x, y) => { const r = {id: "r" + rooms.length, x, y, links: [], hiddenLinks: [], state: "unseen"}; rooms.push(r); grid[x+","+y] = r; return r; };
-  const start = addRoom(0, 1); let guard = 0;
-  while (rooms.length < size && guard++ < 400){
-    const from = rooms[Math.floor(rng()*rooms.length)]; const [dx,dy] = [[1,0],[0,1],[0,-1],[1,0],[-1,0]][Math.floor(rng()*5)];
-    const x = from.x+dx, y = from.y+dy; if (x<0||y<0||x>=GW||y>=GH||grid[x+","+y]) continue;
-    const r = addRoom(x, y); r.links.push(from.id); from.links.push(r.id);
-  }
-  for (const r of rooms){ for (const [dx,dy] of [[1,0],[0,1]]){ const o = grid[(r.x+dx)+","+(r.y+dy)]; if (o && !r.links.includes(o.id) && rng() < 0.25){ r.links.push(o.id); o.links.push(r.id); } } }
-  const dist = {[start.id]:0}; const q = [start]; while (q.length){ const r = q.shift(); for (const id of r.links){ if (dist[id] == null){ dist[id] = dist[r.id] + 1; q.push(rooms.find(x=>x.id===id)); } } }
-  const boss = rooms.slice(1).sort((a,b) => dist[b.id] - dist[a.id])[0];
-  let secret = null;
-  for (let t=0; t<30 && !secret; t++){ const host = rooms[1 + Math.floor(rng()*(rooms.length-1))]; if (host === boss) continue; const [dx,dy] = [[1,0],[-1,0],[0,1],[0,-1]][Math.floor(rng()*4)]; const x = host.x+dx, y = host.y+dy; if (x<0||y<0||x>=GW||y>=GH||grid[x+","+y]) continue; secret = addRoom(x,y); secret.hiddenLinks.push(host.id); host.hiddenLinks.push(secret.id); secret.secret = true; }
-  const names = [...(ROOM_NAMES[theme]||[]), ...ROOM_NAMES.generic].sort(() => rng() - 0.5); let ni = 0;
-  const pool = THEMES[theme].pools[tier];
-  const middle = rooms.filter(r => r !== start && r !== boss && r !== secret);
-  const types = ["combat","combat","trap","treasure","mystery","combat","camp","shrine","combat"];
-  middle.forEach((r, i) => { r.type = types[i % types.length]; });
-  start.type = "entrance"; boss.type = "boss"; if (secret) secret.type = "treasure";
-  for (const r of rooms){
-    r.name = r.type === "entrance" ? (loc.fallen ? "Town Gate" : "Entrance") : r.type === "boss" ? (loc.villain ? `${loc.villain.name}'s Lair` : loc.fallen ? "The Occupied Keep" : "The Heart of " + loc.name.replace(/^The /,"")) : names[ni++ % names.length];
-    if (r.type === "combat"){ r.enemies = buildEncounter(pool, encounterBudget(members, rng() < 0.3 ? "hard" : "medium", L), 5); r.tactics = rollRoomTactics(rng, theme, pool, members, L); }
-    if (r.type === "boss"){ const enc = bossEncounter(c, theme, loc.important ? "deadly" : "hard", loc.villain?.name || loc.bossName, L); r.enemies = enc.enemies; r.bossName = loc.villain?.name || loc.bossName || enc.boss; r.loot = rollLoot(L + 1, "boss");
-      if (loc.villain) for (const t of (c.traitors||[])) r.enemies.push({ name: TRAITOR_BASE[t.cls] || "Veteran", count: 1, displayName: `${t.name} the Traitor` }); }
-    if (r.type === "treasure"){ r.loot = rollLoot(L, r.secret ? "boss" : "chest"); if (!r.secret && rng() < 0.25) r.mimic = true; }
-    if (r.type === "trap"){ const tr = TRAPS[Math.floor(rng()*TRAPS.length)]; r.trap = {...tr, dc: 12 + tier, dmg: `${2 + tier*2}d6`}; }
-    if (r.type === "mystery") r.feature = MYSTERIES[Math.floor(rng()*MYSTERIES.length)];
-  }
-  if (loc.questItem){ const target = boss.loot ? boss : rooms.find(r => r.loot) || boss; target.loot = target.loot || {gold:0, items:[]}; target.loot.items.push({name: loc.questItem, type:"quest", quest:true, description:"The object of a bounty."}); }
-  loc.dungeon = { theme, rooms, current: start.id, cleared: false, bossRoom: boss.id };
-  start.state = "visited"; for (const id of start.links) rooms.find(x=>x.id===id).state = "seen";
-  return loc.dungeon;
-}
 function roomOf(c, id){ const d = dungeonOf(c); return d?.rooms.find(r => r.id === (id || d.current)); }
 function dungeonOf(c){ return c?.explore ? c.locations[c.explore.loc]?.dungeon : null; }
 function roomLinks(r){ return [...r.links, ...r.hiddenLinks.filter(id => (r.found||[]).includes(id))]; }
 function roomBlocked(r){ return ["combat","boss"].includes(r.type) && r.state !== "cleared"; }
-function dungeonContext(c){
-  const d = dungeonOf(c); if (!d) return ""; const loc = c.locations[c.explore.loc]; const r = roomOf(c);
-  const exits = roomLinks(r).map(id => d.rooms.find(x=>x.id===id)).map(x => x.state === "unseen" ? "an unexplored passage" : x.name);
-  return `DUNGEON: exploring ${loc.name} (${THEMES[d.theme].label}). Current room: ${r.name} (${r.type}${r.state==="cleared"?", cleared":""})${r.feature?`, featuring ${r.feature}`:""}. Exits: ${exits.join(", ")||"none"}. The game handles movement between rooms, fights, traps and treasure; you narrate.`;
-}
-async function enterDungeon(locId){
-  const c0 = C(); if (S().busy || c0.combat) return; const loc = c0.locations[locId]; if (!loc) return;
-  store.camp(c => { const l = c.locations[locId]; if (!l.dungeon) genDungeon(c, l); c.explore = {loc: locId}; l.dungeon.current = l.dungeon.rooms[0].id; moveTo(c, l); });
-  await saveCheckpoint(`Entering ${loc.name}`);
-  hostUI(() => store.set({tab:"map"}));
-  const d = dungeonOf(C());
-  await runDM("event", {text: `The party enters ${loc.name}, a ${THEMES[d.theme].label}. Describe the entrance chamber in 2-4 atmospheric sentences: sounds, smells, signs of what dwells within. Companions react briefly.`});
-}
-async function moveToRoom(roomId){
-  const c0 = C(); const d = dungeonOf(c0); if (!d || S().busy || c0.combat) return;
-  const cur = roomOf(c0); const target = d.rooms.find(r => r.id === roomId);
-  if (!target || !roomLinks(cur).includes(roomId)) { coopNotify("You can't reach that room from here.", "bad"); return; }
-  if (roomBlocked(cur)) { coopNotify("Deal with the danger here first.", "bad"); return; }
-  const loc = c0.locations[c0.explore.loc]; const first = target.state !== "visited" && target.state !== "cleared";
-  if (target.type === "boss" && target.state !== "cleared") await saveCheckpoint(`Before ${target.bossName || "the boss"}`);
-  Sfx.play("door");
-  store.camp(c => { const dd = dungeonOf(c); dd.current = roomId; const r = dd.rooms.find(x=>x.id===roomId); if (r.state !== "cleared") r.state = "visited"; for (const id of r.links) { const n = dd.rooms.find(x=>x.id===id); if (n.state === "unseen") n.state = "seen"; } pushLog(c, {kind:"player", text:`Enter: ${r.name}`}); });
-  const r = roomOf(C());
-  if (!first && !roomBlocked(r)){
-    const dd = dungeonOf(C());
-    if (!dd.cleared && Math.random() < 0.12){
-      const spec = randomCombat(C(), dd.theme, "easy"); const foes = spec.enemies.map(e => `${e.count} ${e.name}${e.count>1?"s":""}`).join(" and ");
-      await runDM("event", {text: `As the party passes back through the ${r.name} in ${loc.name}, they run into a wandering patrol: ${foes}. Describe the surprise meeting in 2 sentences. Do NOT set "combat".`, offline: `A wandering patrol, ${foes}, blunders into you in the ${r.name}!`});
-      startCombat({...spec, terrain: r.name}, {origin:{kind:"room", loc: loc.id, room: r.id, wandering: true}}); return;
-    }
-    await runDM("event", {text: `The party returns to the ${r.name} in ${loc.name} (already explored). Describe it in one or two sentences.`, offline: `You return to the ${r.name}.`}); return; }
-  if (r.type === "treasure" && r.mimic){
-    const chk = await partyCheck("Investigation", 13); const surprise = chk.success ? "enemies" : "player";
-    store.camp(c => { const rr = roomOf(c); rr.mimic = false; rr.type = "combat"; rr.enemies = [{name:"Mimic", count: partyLevel(c) >= 5 ? 2 : 1}]; });
-    await runDM("event", {text: `The party enters the ${r.name} in ${loc.name}: a treasure chamber with a fine chest. ${chk.text} ${chk.success ? "They notice the chest is breathing just before touching it: a mimic!" : "The moment someone touches it, the chest sprouts teeth and a sticky pseudopod: a mimic!"} Describe it in 2 sentences. Do NOT set "combat".`,
-      offline: chk.success ? "The chest's wood grain is... breathing. Mimic!" : "The chest lunges at you with a mouthful of teeth. Mimic!"});
-    startCombat({enemies: roomOf(C()).enemies, surprise, terrain: r.name}, {origin:{kind:"room", loc: loc.id, room: r.id}});
-    return;
-  }
-  if (r.type === "combat" || r.type === "boss"){
-    const foes = r.enemies.map(e => `${e.count} ${e.displayName || e.name}${e.count>1?"s":""}`).join(", ");
-    await runDM("event", {text: `The party enters the ${r.name} in ${loc.name}. ${r.type === "boss" ? `This is the lair of ${r.bossName}, the master of this place${loc.villain ? ` (${loc.villain.title || "the campaign's villain"}; motive: ${loc.villain.motive || "unknown"})` : ""}. Give the boss a menacing line of dialogue.` : ""} Waiting inside: ${foes}. Describe the room and the moment the enemies notice the party in 2-4 sentences. Do NOT set "combat"; the game starts the fight.`});
-    startCombat({enemies: r.enemies, terrain: r.name, theme: dungeonOf(C())?.theme, ...(r.type === "combat" && r.tactics ? r.tactics : {})}, {origin:{kind:"room", loc: loc.id, room: r.id, boss: r.type === "boss"}});
-    return;
-  }
-  const notes = []; let extra = "";
-  if (r.type === "trap"){
-    const tr = r.trap; const spot = await partyCheck("Perception", tr.dc);
-    if (spot.success){ store.camp(c => { const m = partyMembers(c); for (const x of m) gainXP(c, x, 25 * partyLevel(c), notes, "trap spotted", x.id !== c.activeCharId); }); extra = `${spot.text} They spot ${tr.n} and avoid it.`; }
-    else {
-      const victims = tr.all ? partyMembers(C()).filter(m=>m.hp>0) : [pick(partyMembers(C()).filter(m=>m.hp>0))];
-      const outs = [];
-      for (const v of victims){ const sv = await partyCheck(tr.save, tr.dc, {save:true, who: v}); const dmg = rollDice(tr.dmg).total; const dealt = sv.success ? Math.floor(dmg/2) : dmg; store.camp(c => damageChar(c, c.characters[v.id], dealt, tr.t, notes, firstName(v.name))); outs.push(`${v.name} ${sv.success?"partly dodges":"is caught"} (${dealt} ${tr.t})`); }
-      extra = `${spot.text} ${tr.n} springs! ${outs.join("; ")}.`;
-    }
-    store.camp(c => { const rr = roomOf(c); rr.state = "cleared"; if (notes.length) pushLog(c, {kind:"sys", notes}); });
-    await runDM("event", {text: `The party enters the ${r.name} in ${loc.name}, which holds a trap: ${r.trap.n}. ${extra} Narrate it (results already applied).`}); return;
-  }
-  if (r.type === "treasure"){ store.camp(c => { const rr = roomOf(c); giveLoot(c, rr.loot, notes); rr.loot = null; rr.state = "cleared"; if (notes.length) pushLog(c, {kind:"sys", notes}); }); await runDM("event", {text: `The party enters the ${r.name}${r.secret ? " (a hidden chamber they uncovered)" : ""} in ${loc.name} and finds treasure: ${notes.map(n=>n.text).join(", ")}. Describe the discovery (items already added to their packs).`}); return; }
-  if (r.type === "shrine"){ const chk = await partyCheck("Religion", 11 + lootTier(partyLevel(C()))); store.camp(c => { if (chk.success){ for (const m of partyMembers(c)) addCond(m, "blessed", {note:"shrine blessing, until your next battle", preCombat:true}); notes.push({kind:"loot", text:"Party blessed"}); } roomOf(c).state = "cleared"; if (notes.length) pushLog(c, {kind:"sys", notes}); }); await runDM("event", {text: `The party finds an old shrine in the ${r.name}. ${chk.text} ${chk.success ? "Its blessing settles on them (+1d4 to attacks and saves in the next battle)." : "It stays cold and silent."} Narrate briefly.`}); return; }
-  if (r.type === "camp"){ store.camp(c => { roomOf(c).state = "cleared"; }); await runDM("event", {text: `The ${r.name} in ${loc.name} is quiet and defensible: a good spot for a short rest. Describe it in 2 sentences.`}); return; }
-  store.camp(c => { roomOf(c).state = "cleared"; const n = []; addClue(c, `strange signs in the ${r.name} of ${loc.name}`, n); if (n.length) pushLog(c, {kind:"sys", notes:n}); });
-  await runDM("event", {text: `The party enters the ${r.name} in ${loc.name}. It holds ${r.feature}. Describe it vividly and leave the mystery for the party to investigate; if they solve it later, reward them with a small treasure or XP.`});
-}
-async function searchRoom(){
-  const c0 = C(); const r = roomOf(c0); if (!r || r.searched || S().busy || roomBlocked(r)) return;
-  const tier = lootTier(partyLevel(c0)); const chk = await partyCheck("Investigation", 12 + tier); const notes = []; let found = [];
-  store.camp(c => { const rr = roomOf(c); rr.searched = true;
-    if (chk.success){ rr.found = [...(rr.found||[]), ...rr.hiddenLinks]; found = rr.hiddenLinks.slice(); for (const id of rr.hiddenLinks){ const s = dungeonOf(c).rooms.find(x=>x.id===id); if (s.state === "unseen") s.state = "seen"; s.found = [...(s.found||[]), rr.id]; }
-      if (!found.length && rnd(2) === 0) giveLoot(c, rollLoot(partyLevel(c), "minor"), notes); }
-    if (found.length) notes.push({kind:"map", text:"Found a secret passage!"}); if (notes.length) pushLog(c, {kind:"sys", notes}); });
-  await runDM("event", {text: `The party searches the ${r.name}. ${chk.text} ${found.length ? "They discover a hidden passage leading to a secret chamber!" : notes.length ? `They find: ${notes.map(n=>n.text).join(", ")}.` : "They find nothing of note."} Narrate in 1-3 sentences.`});
-}
-async function restInDungeon(){
-  const c0 = C(); const r = roomOf(c0); if (!r || S().busy || roomBlocked(r)) return;
-  const safe = r.type === "camp"; const d = dungeonOf(c0); const loc = c0.locations[c0.explore.loc];
-  if (!safe && !d.cleared && Math.random() < 0.3){
-    const spec = randomCombat(c0, d.theme, "easy");
-    await runDM("event", {text: `The party tries to rest in the ${r.name}, but wandering ${spec.enemies.map(e=>e.name).join(" and ")} stumble upon them. Describe the interruption in 2 sentences. Do NOT set "combat".`});
-    startCombat({...spec, terrain: r.name}, {origin:{kind:"room", loc: loc.id, room: r.id, wandering: true}}); return;
-  }
-  if (Coop.remoteCall) doShortRest(autoRestPlan(C()), true); else openModal({type:"shortrest"});
-}
-async function leaveDungeon(){
-  const c0 = C(); const d = dungeonOf(c0); if (!d || S().busy) return;
-  const loc = c0.locations[c0.explore.loc];
-  store.camp(c => { c.explore = null; pushLog(c, {kind:"player", text:`Leave ${loc.name}`}); });
-  await runDM("event", {text: `The party ${roomOf(c0)?.type === "entrance" ? "leaves" : "retraces its steps through the halls and leaves"} ${loc.name}${d.cleared ? ", its master defeated" : ", its depths not yet conquered"}, emerging into the open air. Describe it in 1-2 sentences.`, offline: `You leave ${loc.name} behind and step back into daylight.`});
-}
-async function engageRoom(){
-  const c0 = C(); const r = roomOf(c0); if (!r || !roomBlocked(r) || c0.combat || S().busy) return; const loc = c0.locations[c0.explore.loc];
-  startCombat({enemies: r.enemies, terrain: r.name, theme: dungeonOf(C())?.theme, ...(r.type === "combat" && r.tactics ? r.tactics : {})}, {origin:{kind:"room", loc: loc.id, room: r.id, boss: r.type === "boss"}});
-}
 // survivors of a lost or abandoned room fight stay in the room
 function onCombatLost(c, cm){
   const o = cm.origin || {}; if (o.kind !== "room" || o.wandering) return;
@@ -629,7 +489,7 @@ function checkRecoverQuests(c, itemName, notes){
 // ---- towns & services ----
 function isSettlement(loc){ return loc && ["town","city","village","port","camp"].includes(loc.type); }
 function servicesOf(loc){ if (!loc || loc.fallen) return []; return loc.services || SERVICES[loc.type] || []; }
-function townOf(c){ const l = c.locations[c.currentLocationId]; if (!l) return null; const top = topLoc(c, l.id); return isSettlement(top) ? top : (isSettlement(l) ? l : (l.type === "tavern" || l.type === "shop" || l.type === "temple") && l.parent ? c.locations[l.parent] : null); }
+function townOf(c){ const l = c.locations[c.currentLocationId]; if (!l) return null; if (isSettlement(l)) return l; const p = l.parent ? c.locations[l.parent] : null; if (p && isSettlement(p)) return p; const top = topLoc(c, l.id); return isSettlement(top) ? top : null; }
 const SHOP_BASE = {
   market:["Potion of Healing","Potion of Healing","Potion of Healing","Antitoxin","Healer's Kit","Rations","Rope (50 ft)","Torch","Thieves' Tools","Component Pouch","Holy Symbol","Arcane Focus","Scroll of Cure Wounds","Scroll of Magic Missile"],
   smith:["Longsword","Shortsword","Rapier","Greataxe","Greatsword","Warhammer","Mace","Handaxe","Dagger","Spear","Longbow","Shortbow","Light Crossbow","Leather Armor","Studded Leather","Chain Shirt","Scale Mail","Breastplate","Chain Mail","Splint Armor","Shield"],

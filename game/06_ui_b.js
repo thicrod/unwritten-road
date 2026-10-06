@@ -235,19 +235,23 @@ function PendingRoll(){
 function PlaceBar(){
   const s = useStore(); const c = s.campaign; const busy = !!s.busy || !!c.combat || !!c.pendingRoll;
   const town = townOf(c); const here = topLoc(c, c.currentLocationId); const d = dungeonOf(c);
-  if (d){ const r = roomOf(c); const loc = c.locations[c.explore.loc];
-    return html`<div className="placebar dungeon"><span className="pb-title"><${Icon} n="dungeon" size=${16}/> ${r.name} <span className="faint">· ${loc.name}</span></span>
+  if (d){ const r = roomOf(c); const loc = c.locations[c.explore.loc]; const hostile = d.v >= SITE_V ? d.hostile : true; const people = (r.npcs || []).filter(n => !n.dead && !n.gone).slice(0, 3); const ex = d.v >= SITE_V ? exitInfo(c, d, r) : null;
+    return html`<div className=${"placebar " + (hostile ? "dungeon" : "site")}><span className="pb-title"><${Icon} n=${loc.type} size=${16}/> ${r.name} <span className="faint">· ${loc.name}</span></span>
       ${roomBlocked(r) && !c.combat && html`<button className="chip svc danger" disabled=${!!s.busy} onClick=${engageRoom}><${Icon} n="swords" size=${15}/> Fight!</button>`}
-      <button className="chip" disabled=${busy} onClick=${()=>store.set({tab:"map"})}>Dungeon map</button>
+      <button className="chip" disabled=${busy} onClick=${()=>store.set({tab:"map"})}><${Icon} n="map" size=${14}/> ${hostile ? "Dungeon map" : "Floor plan"}</button>
+      ${people.map(n => html`<button key=${n.id} className="chip" disabled=${busy || roomBlocked(r)} title=${`Talk to ${n.name}`} onClick=${()=>talkTo(n.id)}>💬 ${n.name.split(" ")[0]}</button>`)}
       <button className="chip" disabled=${busy || r.searched || roomBlocked(r)} onClick=${searchRoom}>${r.searched ? "Searched" : "Search room"}</button>
-      <button className="chip" disabled=${busy || roomBlocked(r)} onClick=${restInDungeon}>Short rest</button>
-      ${!roomBlocked(r) && html`<button className="chip" disabled=${busy} onClick=${leaveDungeon}>${r.type === "entrance" ? "Leave" : "Leave (retrace steps)"}</button>`}
-      ${dungeonOf(c).cleared && html`<span className="chip good">Conquered ✓</span>`}</div>`; }
+      ${hostile && html`<button className="chip" disabled=${busy || roomBlocked(r)} onClick=${restInDungeon}>Short rest</button>`}
+      ${ex && html`<button className="chip" disabled=${busy || roomBlocked(r)} onClick=${useExit}>${ex.label}</button>`}
+      ${!roomBlocked(r) && html`<button className="chip" disabled=${busy} onClick=${()=>leaveDungeon()}>${r.entrance || r.type === "entrance" ? "Leave" : "Leave (retrace steps)"}</button>`}
+      ${d.cleared && html`<span className="chip good">Conquered ✓</span>`}</div>`; }
   const btns = [];
   if (town){ const v = standing(c, town); btns.push(html`<span key="st" className=${"chip standing " + standingLabel(v).toLowerCase()} title=${`Your standing in ${town.name}: ${v}. It affects prices and how people treat you.`}>${standingLabel(v)}</span>`); }
   if (here?.fallen) btns.push(html`<span key="fallen" className="chip hp">Occupied by ${c.villain?.name || "the enemy"}</span>`);
   if (town) for (const sv of servicesOf(town)) btns.push(html`<button key=${sv} className="chip svc" disabled=${busy} onClick=${()=>["market","smith"].includes(sv) ? openShop(town.id, sv) : openModal({type:"service", svc: sv, town: town.id})}><${Icon} n=${SERVICE_INFO[sv].icon} size=${15}/> ${SERVICE_INFO[sv].label}</button>`);
   if (isDelvable(here)) btns.push(html`<button key="delve" className="chip svc danger" disabled=${busy} onClick=${()=>enterDungeon(here.id)}><${Icon} n="dungeon" size=${15}/> ${here.fallen ? `Liberate ${here.name}` : here.dungeon ? (here.cleared ? `Revisit ${here.name}` : `Delve into ${here.name}`) : `Explore ${here.name}`}</button>`);
+  else if (town) btns.push(html`<button key="streets" className="chip svc" disabled=${busy} onClick=${()=>store.set({tab:"map"})}><${Icon} n="town" size=${15}/> Walk the streets</button>`);
+  else if (isEnterable(here)) btns.push(html`<button key="inside" className="chip svc" disabled=${busy} onClick=${()=>enterSite(here.id)}><${Icon} n=${here.type} size=${15}/> Go inside</button>`);
   btns.push(html`<button key="travel" className="chip" disabled=${busy} onClick=${()=>store.set({tab:"map"})}><${Icon} n="road" size=${15}/> Travel</button>`);
   const baseBtn = !townOf(c) ? null : inBaseTown(c) ? html`<button key="base" className="chip" onClick=${()=>openModal({type:"base"})}>🏠 ${c.base.name}</button>`
     : canBuyBase(c) ? html`<button key="base" className="chip" title=${`Buy a hall here as your party's base (${BASE_COST} gp)`} onClick=${()=>openModal({type:"confirm", text:`Buy a hall in ${townOf(c).name} as your party's base for ${BASE_COST} gold? Resting there is free, and you can build upgrades.`, okLabel:"Buy it", ok:()=>buyBase()})}>🏠 Buy a base</button>` : null;

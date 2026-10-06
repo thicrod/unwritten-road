@@ -13,7 +13,7 @@ function legendaryAction(c, e){
   if (front.length >= 2 && Math.random() < 0.3){
     const dc = 11 + Math.floor(L / 3), dice = `${1 + Math.ceil(L / 3)}d6`, t = e.atk?.[0]?.t || "bludgeoning";
     clog(c, "enemy", `Legendary action! ${B(e.name)} sweeps across the front line!`); fx(c, { k: "phase", to: e.id });
-    for (const h of front){ const ok = heroSave(c, h, "DEX", dc, "sweep"); const n = dmgOf(dice); hurt(c, h, ok ? Math.floor(n / 2) : n, t); if (!c.combat || c.combat.status !== "active") return; }
+    for (const h of front){ const ok = !!heroSave(c, h, "DEX", dc, "sweep").success; const n = dmgOf(dice); hurt(c, h, ok ? Math.floor(n / 2) : n, t); if (!c.combat || c.combat.status !== "active") return; }
     return;
   }
   const tg = reachableFoes(c, e, true); const tgt = tg.length ? pick(tg) : null; if (!tgt) return;
@@ -45,7 +45,7 @@ function lairAction(c){
   const dc = 11 + Math.floor(L / 3), dice = `${1 + Math.ceil(L / 3)}d6`;
   clog(c, "enemy", `Lair action! ${hz.name}!`); cm.lairFx = { round: cm.round, name: hz.name };
   for (const h of hits){
-    const ok = heroSave(c, h, hz.save, dc, hz.t); const n = dmgOf(dice); fx(c, { k: "phase", to: h.id });
+    const ok = !!heroSave(c, h, hz.save, dc, hz.t).success; const n = dmgOf(dice); fx(c, { k: "phase", to: h.id });
     hurt(c, h, ok ? Math.floor(n / 2) : n, hz.t); if (!c.combat || cm.status !== "active") return;
     if (!ok && hz.cond && isUp(c, h)) addC(c, h, hz.cond, { rounds: 1 });
   }

@@ -114,6 +114,7 @@ HOW TO RUN THE GAME
 - Award XP for non-combat achievements (clever solutions, social victories, discoveries, quest milestones): about 25-60 x level for a meaningful beat; 100-250 x level for completing a quest. The app awards combat XP itself.
 - Loot should feel earned: mostly coins, mundane gear and potions. Magic items are rare (uncommon at levels 1-4, occasionally rare from level 5).
 - THE WORLD ENGINE: the game itself runs overland travel (with random encounters and events), dungeons room by room, shops, temples, inns, recruiting and bounty quests, and it tells you what happened so you can narrate it. When the party moves somewhere nearby within a scene (into a building, down a street), set "location". Add places they learn about to "locations"; the game places them on the map. Use "hidden": true for secret places not yet on the map.
+- PLACES HAVE MAPS: every town has a street map of buildings, and every building, dungeon, cave, sewer or ruin has a floor plan of rooms, furniture, people and secrets that the game draws and runs (see INSIDE / PLACES IN TOWN in the state). Inside a place, when the party goes to another room, set "room" to that room's id. When their actions genuinely earn a discovery, set "reveal": ["<hidden thing or secret room name>"]; when they change something (burn a table, break a door, empty a chest), set "object_state": {"<object name>": "burned"}. If the owner invites them to use private rooms, set "welcome": true. Give new buildings a "site" hint so the game builds the right kind of place.
 - Combat: when violence begins (or the player attacks someone), describe the opening moment and set "combat". The app runs the fight turn by turn for the whole party; don't narrate its outcome. Total enemy XP for the WHOLE PARTY (L = average level, N = party size): easy about 40 x L x N, medium 80 x L x N, hard 120 x L x N. Prefer bestiary names; otherwise give full stats. Not every conflict must be a fight.
 - THE PARTY: the player leads up to 3 AI companions (see PARTY). Give them life, but put their spoken words in "party_talk", not in the narration: 1-3 short lines (under 25 words each) in most replies whenever companions are present and conscious. They react to what just happened, to the player, and to EACH OTHER (banter, teasing, worry, disagreement, support), each in a distinct voice that fits their personality and approval. Skip it only in tense silent moments, or when the party is apart. Never write lines for the player's own hero or for human-played heroes.
 - Dialogue choices: whenever an NPC talks with the party, makes an offer, or there's a clear decision point, include "choices": 4-5 short options in the player's voice, covering: one that agrees or accepts (tone "accept"), one that refuses or pushes back ("refuse"), one question that digs deeper ("ask"), one skill play tagged with its skill such as Persuasion, Deception, Intimidation or Insight ("skill"), and one wildcard: something unexpected, bold or funny the hero might say ("wild"). Keep each under 14 words.
@@ -152,7 +153,7 @@ Keys:
 "flags": {"spared_the_bandit_chief": true}, "reputation": {"faction name": 10}
 
 ITEM: {"name":"...","type":"weapon|armor|shield|potion|scroll|ring|amulet|cloak|wondrous|gear|treasure|quest|key","base":"standard base item such as Longsword or Chain Mail","qty":1,"value":10,"rarity":"common|uncommon|rare|very rare","description":"...", weapons add "damage":"1d8","damage_type":"slashing","properties":["finesse","light","two-handed","ranged","versatile:1d10","thrown","heavy"],"bonus":0-3,"extra_damage":"1d6","extra_damage_type":"fire"; armor adds "armor":"light|medium|heavy","ac":14; other magic may use "ac_bonus","ability_bonus":{"STR":2},"save_bonus","resist":["fire"],"heal":"2d4+2","spell":"Fireball","slot":"head|hands|feet|cloak|amulet|ring"}
-LOCATION: {"id":"slug","name":"...","type":"town|city|village|forest|mountain|dungeon|castle|cave|ruins|tavern|shop|temple|camp|road|swamp|lake|tower|port","x":0-100,"y":0-100,"description":"one or two sentences","discovered":true (false = only rumored),"parent":"id of the settlement it sits inside (taverns, shops, halls)","important":false,"hostile":false (true for enemy-held castles, towers, temples; dungeons, caves and ruins are always explorable),"connects":["ids of adjacent places"]}
+LOCATION: {"id":"slug","name":"...","type":"town|city|village|forest|mountain|dungeon|castle|cave|ruins|tavern|shop|temple|camp|road|swamp|lake|tower|port|sewer|guardhouse|hall|house|warehouse|docks|farm|cemetery|market","x":0-100,"y":0-100,"description":"one or two sentences","discovered":true (false = only rumored),"parent":"id of the settlement it sits inside (taverns, shops, halls)","important":false,"hostile":false (true for enemy-held castles, towers, temples; dungeons, caves and ruins are always explorable),"connects":["ids of adjacent places"],"site":{"kind":"tavern|inn|shop|smith|alchemist|temple|guardhouse|prison|manor|house|library|guildhall|warehouse|docks|ship|farm|cemetery|market|square|lab|shrine|camp|cave|mine|crypt|dungeon|ruins|tower|castle|lair|sewer","size":"small|medium|large","mood":"cozy|rough|noble|ruined|haunted|magical|shady","danger":"none|low|high"} (optional: what kind of place to build inside)}
 Map: x grows east, y grows south, neighbouring places sit 8-20 units apart; places with a parent need no coordinates.
 ENEMY: {"name":"...","count":1,"hp":20,"ac":13,"type":"humanoid|beast|undead|...","xp":100,"mods":{"STR":2,"DEX":1,"CON":1,"INT":0,"WIS":0,"CHA":0},"attacks":[{"name":"...","to_hit":4,"damage":"1d8+2","type":"slashing","ranged":false}],"multiattack":["Claw","Bite"],"abilities":[{"name":"...","kind":"save","save":"DEX","dc":13,"damage":"4d6","type":"fire","half":true,"condition":"prone","recharge":5,"description":"..."}],"resist":[],"immune":[],"vulnerable":[],"tactics":"how it fights and when it flees"}`;
 
@@ -176,6 +177,7 @@ function worldSummary(c){
   L.push("NPCS:\n" + ([...here, ...rest].map(n=>`- [${n.id}] ${n.name}${n.race?`, ${n.race}`:""} ${n.role?`(${n.role})`:""}${n.location?` at ${n.location}`:""}, attitude ${n.attitude??0}${n.status&&n.status!=="alive"?`, ${n.status}`:""}. ${n.personality||""} ${n.notes||""}${(n.memories||[]).length ? ` Remembers about the party: ${n.memories.join(" | ")}` : ""}`).join("\n")||"- none"));
   if (c.companions.length) L.push("ANIMAL COMPANIONS & HIRELINGS: " + c.companions.map(p=>`${p.name} (${p.race||""} ${p.role||""}, HP ${p.hp}/${p.maxHp})`).join("; "));
   if (c.explore) L.push(dungeonContext(c));
+  else { const tn = townOf(c); if (tn?.town){ const bs = tn.town.buildings.filter(b => b.kind !== "house" || b.loc).map(b => `${b.loc && c.locations[b.loc] ? `${c.locations[b.loc].name} [${b.loc}]` : b.name} (${BUILDING_KINDS[b.kind]?.label || b.kind})`); L.push(`PLACES IN ${tn.name.toUpperCase()} (the party can walk into any of them; set "location" with the id, or a new LOCATION with "parent":"${tn.id}" for a place not listed): ${bs.join("; ")}${tn.town.sewer && c.locations[tn.town.sewer]?.discovered ? `; the sewers below [${tn.town.sewer}]` : ""}.`); } }
   if (c.villain && !c.villainDefeated){ const th = c.threat || {stage:0}; const fallen = topLevelLocs(c).filter(l => l.fallen).map(l => l.name); const lts = topLevelLocs(c).filter(l => l.lieutenant).map(l => `${l.lieutenant} at ${l.name}`);
     L.push(`VILLAIN'S PROGRESS: threat ${threatLabel(th.stage)} (stage ${th.stage}).${fallen.length ? ` Fallen towns: ${fallen.join(", ")}.` : ""}${lts.length ? ` Lieutenants: ${lts.join("; ")}.` : ""} Let this color the world: worried NPCs, refugees, patrols.`); }
   if (c.villainDefeated) L.push(`THE VILLAIN ${c.villain?.name || ""} HAS BEEN DEFEATED. The main story is complete; the world is open for further adventures.`);
@@ -315,6 +317,7 @@ function normLoc(c, L, near){
     if (L.description) ex.description = String(L.description).slice(0,400); if (L.discovered === true) ex.discovered = true; if (L.important != null) ex.important = !!L.important;
     if (Array.isArray(L.connects)) for (const k of L.connects) link(c, ex.id, k);
     if (L.type && LOC_TYPES.includes(L.type)) ex.type = L.type; if (L.name) ex.name = String(L.name).slice(0,50); if (L.hostile) ex.hostile = true; if (L.hidden === false || L.discovered === true) ex.hidden = false;
+    if (L.site && typeof L.site === "object" && !ex.dungeon) ex.site = { ...(ex.site || {}), ...siteHint(L.site) };
     return ex;
   }
   if (!L.name) return null;
@@ -323,9 +326,11 @@ function normLoc(c, L, near){
   if (!parent && (!Number.isFinite(x) || !Number.isFinite(y))){ const base = near ? topLoc(c, near) : null; const a = Math.random()*Math.PI*2, r = 10 + Math.random()*8; x = (base?.x ?? 50) + Math.cos(a)*r; y = (base?.y ?? 50) + Math.sin(a)*r; }
   const loc = { id, name:String(L.name).slice(0,50), type: LOC_TYPES.includes(L.type) ? L.type : "ruins", x: parent ? null : clamp(x,4,96), y: parent ? null : clamp(y,5,95),
     description: String(L.description||"").slice(0,400), discovered: L.discovered !== false && !L.hidden, hidden: !!L.hidden, visited:false, parent, important: !!L.important, hostile: !!L.hostile, theme: THEMES[L.theme] ? L.theme : undefined, connections:[] };
+  if (L.site && typeof L.site === "object") loc.site = siteHint(L.site);
   c.locations[id] = loc; if (Array.isArray(L.connects)) for (const k of L.connects) link(c, id, k);
   return loc;
 }
+function siteHint(h){ const out = {}; if (typeof h.kind === "string" && SITE_PLANS[h.kind]) out.kind = h.kind; if (["small","medium","large"].includes(h.size)) out.size = h.size; if (["cozy","rough","noble","ruined","haunted","magical","shady"].includes(h.mood)) out.mood = h.mood; if (["none","low","high"].includes(h.danger)) out.danger = h.danger; return out; }
 function link(c, a, b){ const A = c.locations[a], B = c.locations[b] || Object.values(c.locations).find(x=>x.name.toLowerCase()===String(b).toLowerCase()); if (!A || !B || A.id===B.id) return;
   A.connections = [...new Set([...(A.connections||[]), B.id])]; B.connections = [...new Set([...(B.connections||[]), A.id])]; }
 function moveTo(c, loc){
@@ -333,6 +338,12 @@ function moveTo(c, loc){
   const pa = topLoc(c, prev), pb = topLoc(c, loc.id); if (pa && pb && pa.id !== pb.id) link(c, pa.id, pb.id);
   if (loc.parent && c.locations[loc.parent]){ c.locations[loc.parent].visited = true; c.locations[loc.parent].discovered = true; }
   c.currentLocationId = loc.id;
+}
+// the party walked (or was narrated) into a place: show its map; walked out of one: close it
+function syncExplore(c, l){
+  if (!l) return; if (c.explore && c.explore.loc === l.id) return;
+  if (l.parent && c.locations[l.parent] && isEnterable(l) && !isDelvable(l)){ try { ensureTown(c, c.locations[l.parent]); const s = ensureSite(c, l); s.entered = true; s.current = s.entrance; markSeen(s, s.entrance); c.explore = { loc: l.id }; return; } catch (e) { console.warn("site", e); } }
+  c.explore = null;
 }
 function upsertQuest(c, q){
   if (!q || typeof q !== "object") return null;
@@ -366,9 +377,11 @@ function applyState(c, st){
   for (const L of newLocs){ const had = c.locations[L.id] || Object.values(c.locations).some(x=>x.name===L.name); const l = normLoc(c, L, c.currentLocationId); if (l && !had && L !== st.location && !l.hidden) N("map", `${l.discovered?"Discovered":"Heard of"}: ${l.name}`); }
   if (st.villain && typeof st.villain === "object"){ c.villain = { name: String(st.villain.name||"").slice(0,60), title: String(st.villain.title||"").slice(0,60), motive: String(st.villain.motive||"").slice(0,200), theme: THEMES[st.villain.theme] ? st.villain.theme : null, lair: st.villain.lair }; }
   if (c.world) ensureWorldMap(c);
+  try { const tn = townOf(c); if (tn) ensureTown(c, tn); } catch (e) { console.warn("town", e); }
   if (c.villain?.lair){ const lair = c.locations[c.villain.lair] || Object.values(c.locations).find(l => l.name.toLowerCase() === String(c.villain.lair).toLowerCase()); if (lair && !lair.villain){ lair.villain = c.villain; lair.important = true; if (c.villain.theme) lair.theme = c.villain.theme; lair.lvl = Math.max(lair.lvl || 1, 5); if (!DUNGEON_TYPES.includes(lair.type) || SETTLEMENTS.includes(lair.type) && !["castle","tower","temple"].includes(lair.type)) lair.type = "dungeon"; } }
   if (st.location){ const l = typeof st.location === "string" ? (c.locations[st.location] || Object.values(c.locations).find(x=>x.name.toLowerCase()===st.location.toLowerCase())) : normLoc(c, st.location, c.currentLocationId);
-    if (l && l.id !== c.currentLocationId){ const top0 = topLoc(c, c.currentLocationId)?.id; moveTo(c, l); if (topLoc(c, l.id)?.id !== top0) c.explore = null; onArrive(c, topLoc(c, l.id) || l, notes); N("map", `Now at ${l.name}`); } else if (l) moveTo(c, l); }
+    if (l && l.id !== c.currentLocationId){ moveTo(c, l); syncExplore(c, l); onArrive(c, topLoc(c, l.id) || l, notes); N("map", `Now at ${l.name}`); } else if (l) moveTo(c, l); }
+  try { applySiteState(c, st, notes); } catch (e) { console.warn("site state", e); }
   if (st.time && typeof st.time === "string") c.time.phase = st.time;
   if (st.day_advance) { c.time.day += clamp(num(st.day_advance,1),1,30); }
   if (st.gold){ const g = Math.round(num(st.gold)); ch.gold = Math.max(0, ch.gold + g); N(g>0?"loot":"hurt", `${g>0?"+":""}${g} gold`); }

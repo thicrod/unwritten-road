@@ -11,7 +11,7 @@
   const Net = window.Net = {
     me, socket: null, room: null, v: 0, status: "offline", orig: {}, applying: false,
     // actions any player may take; the value is what the acting player's own screen does right after
-    CALLS: { enterDungeon: "map", moveToRoom: null, leaveDungeon: null, searchRoom: null, restInDungeon: null, engageRoom: null, craft: null, forage: null,
+    CALLS: { enterDungeon: "map", enterSite: "map", enterBuilding: "map", moveToRoom: null, leaveDungeon: null, leaveSite: null, searchRoom: null, restInDungeon: null, engageRoom: null, unlockDoor: null, useObject: null, talkTo: "adventure", useExit: "map", useTownFeature: null, goToRoom: null, craft: null, forage: null,
       openShop: "shop", shopBuy: null, shopSell: null, castOutOfCombat: "close", useItemOutOfCombat: "close", doShortRest: "close",
       innRest: "close", innRumors: "close", recruitAt: "close", templeHeal: null, templeCure: null, templeRaise: "close", refreshBoard: null, takeBounty: null,
       gearEquip: null, gearUnequip: null, gearGive: null, gearDrop: null, partySet: null, applyUpgrade: null, applyHeroLevelUp: "close", buyBase: null, buyUpgrade: null, baseRest: "close", baseStudy: null, baseTrain: null, baseCollect: null },
@@ -66,7 +66,7 @@
           const args = a.filter(x => !(x && typeof x === "object" && ("nativeEvent" in x || x instanceof Event)));
           let safe = []; try { safe = JSON.parse(JSON.stringify(args)); } catch {}
           Net.intent({ type: "call", fn: name, args: safe });
-          if (after === "close") closeModal(); else if (after === "shop") openModal({ type: "shop" }); else if (after === "map") store.set({ tab: "map" });
+          if (after === "close") closeModal(); else if (after === "shop") openModal({ type: "shop" }); else if (after === "map") store.set({ tab: "map" }); else if (after === "adventure") store.set({ tab: "adventure" });
         };
       }
       for (const name of ["combatLoop", "beginTravel", "startCombat", "leaveCombat", "saveNow", "scheduleSave", "resolveEvent", "requestRest", "loadCheckpoint"]) {

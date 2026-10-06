@@ -413,5 +413,13 @@ const ICONS = {
   compass:["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z","M15.5 8.5l-2 5-5 2 2-5z"], skull:["M5 11a7 7 0 1 1 14 0v4h-3v4H8v-4H5z","M9 12a1.2 1.2 0 1 0 0-.1","M15 12a1.2 1.2 0 1 0 0-.1","M11 19v-2","M13 19v-2"]
 };
 const CLASS_ICON = {Barbarian:"axe",Bard:"lute",Cleric:"sun2",Druid:"leaf",Fighter:"swordshield",Monk:"fist",Paladin:"shieldx",Ranger:"bow",Rogue:"dagger",Sorcerer:"flame",Warlock:"eye2",Wizard:"hat"};
-const LOC_TYPES = ["town","city","village","forest","mountain","dungeon","castle","cave","ruins","tavern","shop","temple","camp","road","swamp","lake","tower","port"];
+const LOC_TYPES = ["town","city","village","forest","mountain","dungeon","castle","cave","ruins","tavern","shop","temple","camp","road","swamp","lake","tower","port","sewer","guardhouse","hall","house","warehouse","docks","farm","cemetery","market"];
+// icons for the building types that towns are made of
+Object.assign(ICONS, {
+  sewer:["M4 10h16","M4 14h16","M8 6v12","M12 6v12","M16 6v12","M3 18h18"], guardhouse:["M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z","M12 8v6","M9 11h6"],
+  hall:["M3 21h18","M5 21V9h14v12","M12 3 3 9h18z","M9 21v-6h6v6"], house:["M3 11 12 4l9 7","M5 10v10h14V10","M10 20v-6h4v6"],
+  warehouse:["M3 21V9l9-5 9 5v12","M3 21h18","M7 21v-6h4v6","M13 21v-6h4v6","M7 12h10"], docks:["M3 12h18","M6 12v8","M12 12v8","M18 12v8","M3 20h18","M8 4v8","M8 4h7l-2 3 2 3H8"],
+  farm:["M3 21h18","M4 21v-9l6-5 6 5v9","M8 21v-5h4v5","M17 12h4v9h-4","M19 7v5"], cemetery:["M8 21V9a4 4 0 0 1 8 0v12","M6 21h12","M12 11v5","M10 13h4","M3 21h18"],
+  market:["M3 10l2-6h14l2 6","M3 10h18","M5 10v10h14V10","M9 20v-5h6v5","M3 10c0 2 2 2 2 0s2-2 2 0 2 2 2 0 2-2 2 0 2 2 2 0 2-2 2 0 2 2 2 0"],
+});
 </script>

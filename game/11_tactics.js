@@ -9,7 +9,30 @@
 // Ranged attacks against someone in the back line get +2 AC (half cover) while their front line stands.
 function coverBonus(c, att, tgt, a){
   if (!(a.ranged || (a.spell && !a.melee)) || tgt.pos !== "back") return 0;
-  return cbList(c).some(x => x.side === tgt.side && x.id !== tgt.id && x.pos === "front" && isUp(c, x)) ? 2 : 0;
+  if (cbList(c).some(x => x.side === tgt.side && x.id !== tgt.id && x.pos === "front" && isUp(c, x))) return 2;
+  return c.combat?.room?.cover ? 2 : 0;   // furniture, pillars and rubble shelter the back line even once the front falls
+}
+// the room fights too: fire spreads, floors give way, gas chokes, water drags
+const ROOM_HAZARDS = {
+  fire:     { name: "Flames spread across the room", save: "DEX", t: "fire", cond: "burning" },
+  gas:      { name: "Choking fumes fill the air", save: "CON", t: "poison", cond: "poisoned" },
+  water:    { name: "The water surges, dragging at legs", save: "STR", t: "bludgeoning", cond: "prone" },
+  collapse: { name: "Stones fall from the ceiling", save: "DEX", t: "bludgeoning", cond: "prone" },
+  ice:      { name: "The ice cracks and shifts", save: "DEX", t: "cold", cond: "prone" },
+};
+function roomBattleNote(room){ const bits = []; if (room.cover) bits.push("cover for the back line"); if (room.choke) bits.push("a chokepoint: only two foes can press in at once"); if (room.high) bits.push("the high ground (+1 to ranged attacks)"); if (room.escape) bits.push("an escape route"); if (room.hazard && ROOM_HAZARDS[room.hazard]) bits.push(`a hazard: ${room.hazard}`); return bits.length ? `The ${room.name || "room"} offers ${bits.join(", ")}.` : ""; }
+function roomHazardRound(c){
+  const cm = c.combat; const hz = cm?.room?.hazard && ROOM_HAZARDS[cm.room.hazard]; if (!hz || cm.status !== "active" || cm.sandbox || cm.round < 2 || cm.round % 2) return;
+  const L = partyLevel(c); const dc = 10 + Math.floor(L / 3), dice = `${1 + Math.floor(L / 4)}d6`;
+  const heroes = party(c).filter(x => x.kind === "pc" && isUp(c, x)), foes = enemies(c).filter(e => isUp(c, e));
+  const hits = [...(heroes.length ? [heroes[rnd(heroes.length)]] : []), ...(foes.length ? [foes[rnd(foes.length)]] : [])];
+  clog(c, "sys", `${hz.name}!`); cm.lairFx = { round: cm.round, name: hz.name };
+  for (const h of hits){
+    const n = dmgOf(dice); let ok;
+    if (h.kind === "pc") ok = !!heroSave(c, h, hz.save, dc, hz.t).success; else ok = d(20) + (h.mods?.[hz.save] || 0) >= dc;
+    const dealt = ok ? Math.floor(n / 2) : n; const real = hurt(c, h, dealt, hz.t); clog(c, "sys", `${h.name} ${ok ? "weathers it" : "is caught"}${real ? ` (${real} ${hz.t})` : ""}.`); if (!c.combat || cm.status !== "active") return;
+    if (!ok && hz.cond && isUp(c, h)) addC(c, h, hz.cond, { rounds: 1 });
+  }
 }
 // Flanking: once an ally has already struck a target in melee this round, further melee attacks on it have advantage.
 function tacticalFlank(c, att, tgt){ const m = c.combat?.melee?.[tgt.id]; return !!m && m.some(id => id !== att.id && c.combat.cbt[id]?.side === att.side); }
@@ -67,8 +90,9 @@ function objectiveProgress(c){
 function tacticsRound(c){
   try { if (c.combat?.round === 1 || !c.combat?.factionAlly) factionAllies(c); } catch (e) { console.warn(e); }
   try { lairAction(c); } catch (e) { console.warn("lair action", e); }
+  try { roomHazardRound(c); } catch (e) { console.warn("room hazard", e); }
   const cm = c.combat; if (!cm || cm.status !== "active") return;
-  cm.melee = {};
+  cm.melee = {}; cm.chokeUsed = 0;
   if (cm.reinforce && cm.round >= cm.reinforce.round && !cm.reinforce.done){
     cm.reinforce.done = true; clog(c, "enemy", `**${cm.reinforce.text}**`);
     for (const e of cm.reinforce.enemies) for (const x of addEnemies(c, { name: e.name, count: e.count || 1 })){ x.summoned = false; x.pos = x.pos || "front"; fx(c, { k: "cond", to: x.id, n: "Arrives!" }); }

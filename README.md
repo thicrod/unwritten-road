@@ -137,7 +137,7 @@ ANTHROPIC_API_KEY=sk-ant-... npm start
   - **Your d20 rolls wait for you:** attacks, death saves and checks from events and traps show the die with "Tap to roll". The result is decided when you click.
   - **Checks the DM asks for** (talking to NPCs, sneaking…) wait for the Roll button instead of rolling themselves.
   - **In co-op** each player taps for their own hero's rolls on their own screen; everyone else sees the result.
-- **Battle map:** every fight shows a live battlefield drawn for the terrain (forest, cave, crypt, swamp, town…).
+- **Battle map:** every fight shows a live battlefield drawn for the terrain (forest, cave, crypt, swamp, town…), or the actual room when the fight starts inside a mapped place.
   - Your party is on the left and enemies on the right, each in front and back lines, as portrait tokens with HP rings and condition badges.
   - The active character glows, and a "Your turn" banner shows when it's yours.
   - Tap an enemy token to target it. 🛡 marks foes your melee can't reach past their front line.
@@ -160,6 +160,27 @@ ANTHROPIC_API_KEY=sk-ant-... npm start
 - **"Previously on…" recaps** when you continue a campaign or join a game in progress: the party, the story so far, the current act and the last scene. One button asks the DM for a spoken recap to read aloud.
 - **Ambient music** (Settings → Music; off by default): synthesized in the browser, following the scene through towns, wilds, dungeons, battles and boss fights, with crossfades and reverb.
 - **Sturdier DM replies:** the parser accepts common variations from smaller models (mangled markers, fenced or whole-object JSON, "Narration:" labels) and repairs replies cut off mid-JSON.
+
+## Places you can walk through: towns, buildings, dungeons and sewers
+
+Every place in the world has a map of its own, drawn by the game and run by the game, with the Dungeon Master narrating on top.
+
+- **Towns have streets.** Arrive in a settlement and the Map tab shows its street map: a square with a fountain and notice board, the tavern, smithy, market, temple, guard station, town hall, houses, warehouses, stables, a cemetery, docks in ports, a keep in cities, walls and gates. Tap a building to see what it is, then **Go inside**. The tavern the DM named in the opening is the town's tavern; new buildings get names of their own the first time you enter.
+- **Buildings have floor plans.** Inside, you see rooms, doors, stairs and furniture: a tavern has its common room, kitchen, storeroom, private room, guest rooms upstairs and a cellar below; a guard station has its hall, armory, captain's office and cells; manors, temples, libraries, shops, smithies, apothecaries, warehouses, docks, ships, farms, cemeteries, markets and wizard's laboratories all have layouts of their own (some 30 kinds of place, each generated differently every time). Tap a glowing room to walk there; stairs, ladders and trapdoors switch floors.
+  - **Furniture does things:** examine, search, open, read, pull, pray, rest, take. Chests, crates, desks and coffins can hold loot (and sometimes worse), levers open hidden doors, altars bless, beds and campfires let you rest, racks hold weapons, notice boards hold bounties.
+  - **People are in their places:** innkeepers behind the bar, guards in the hall, prisoners in the cells, the DM's own NPCs in the room that fits their role. Tap someone to **Talk** and the DM plays them.
+  - **Private rooms** (the owner's quarters, the back office, the cells) are off limits: sneak in with a group Stealth check or get caught, with consequences for your reputation, and a fight if it's the guards.
+  - **Locked doors and chests** take a key, Thieves' Tools (Sleight of Hand) or a shoulder (Athletics, and noisy).
+  - **Secrets:** hidden stashes, false walls and secret passages are found by searching rooms (Investigation), by pulling the right lever, or when the DM decides your actions earned it.
+  - **Every map tells a story:** a brawl's aftermath, drag marks from a kidnapping, a secret meeting's map, a ransacked study, a ritual's circle, a prison break. Examining the clue has the DM narrate it, and the DM carries the private note behind it so you can follow the thread.
+- **Dungeons use the same system.** Caves, crypts, mines, ruins, towers, enemy keeps, bandit and goblin camps, monster lairs and desecrated temples are multi-floor floor plans now, keeping everything dungeon rooms always had: fights, bosses, traps, treasure, mysteries, shrines, safe spots to rest, quest items and secret passages. Campaigns saved with the old room grid upgrade automatically.
+- **Under the streets.** Towns, cities and ports have sewers: brick channels, a junction, a cistern, a smugglers' hideout, a rat warren and a cult chamber below. The way down is a grate in the back alley (Investigation), a tunnel from the tavern cellar, the guard station's cells, or a noble's escape passage, and tunnels lead back up into the tavern or under the keep.
+- **Fights happen in the room.** The battle map is the room itself, furniture and all, and the room matters: tables, pillars and rubble give the back line cover; doorways and tunnels are chokepoints where only two foes can press in at once; balconies give the high ground (+1 to ranged attacks); back doors and windows make running away easier; fire, water, gas, falling stone and ice are hazards that hit both sides every other round.
+- **The world remembers.** Opened chests stay empty, freed prisoners stay free (and become NPCs who remember you), unlocked doors stay unlocked, burned things stay burned, the DM's changes to objects persist, and a place looks the same every time you return.
+- **Strange places.** Some places are wonders: an inn inside a giant tree, an inn between worlds, a library whose books are alive, a market that opens only at midnight, a village inside a giant skull, a tower that changes its layout, a sinking castle, a battlefield frozen in time, a lighthouse that commands the weather, a house where nobody can lie.
+- **The DM is in on it.** The DM sees the room the party is in (what's visible, who's there, the exits, and separately the secrets it must not blurt out), moves the party between rooms when the story does (`"room"`), reveals secrets the players earned (`"reveal"`), changes objects (`"object_state"`), and can ask for a kind of place when it invents a location (`"site": {"kind": "prison", "size": "large", "mood": "shady"}`). First visits to a room are narrated; walking back through known rooms costs no DM request.
+
+In co-op, every click inside a place is a shared action that runs on the host, and the map, tokens and furniture states sync to everyone.
 
 ## Progression and extras
 
@@ -288,7 +309,7 @@ The repo includes a Render Blueprint (`render.yaml`), so setup takes a few click
 ## Project layout
 
 ```
-game/        game source (shared by both builds)
+game/        game source (shared by both builds); 28_sites.js generates floor plans, 29_sites_play.js runs them, 30_towns.js makes street maps, 06_ui_s.js draws them
 web/         platform.js (the website's replacement for Claude's built-in AI), net.js (online co-op client)
 server/      index.js (web server), dm.js (Anthropic proxy), limits.js, rooms.js (co-op rooms), mock DM for development
 shared/      jpatch.js: state diff/patch used by both the server and the browser

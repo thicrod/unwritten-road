@@ -46,6 +46,22 @@ function SceneArt({ kind }){
     <rect width="1000" height="300" fill=${`url(#${id}v)`}/>
   </svg>`;
 }
+// a fight inside a mapped room: the battlefield is the room itself, furniture and all
+function RoomScene({ room }){
+  const st = SITE_STYLES[room.style] || SITE_STYLES.stone; const sx = 1000 / Math.max(1, room.w), sy = 300 / Math.max(1, room.h);
+  const dark = room.light === "dark", dim = room.light === "dim";
+  return html`<svg className="bt-scene" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="bt-floor" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill=${st.floor}/><path d=${st.rough ? "M10,15 q8,-8 16,0 q8,8 16,0" : "M0,0 h50 v50 M25,25 h25"} stroke=${st.floor2} strokeWidth="1.5" fill="none"/></pattern>
+      <radialGradient id="bt-vig" cx="50%" cy="55%" r="70%"><stop offset="60%" stopColor="#000" stopOpacity="0"/><stop offset="100%" stopColor="#000" stopOpacity=".55"/></radialGradient></defs>
+    <rect width="1000" height="300" fill="url(#bt-floor)"/>
+    <rect x="6" y="6" width="988" height="288" fill="none" stroke=${st.wall} strokeWidth="12" rx="6"/>
+    ${(room.objects || []).map((o, i) => html`<g key=${i} transform=${`translate(${o.x * sx} ${o.y * sy}) scale(${Math.min(sx, sy) / SU * 0.8})`} opacity=".85"><${ObjGlyph} o=${{ ...o, id: "b" + i }} style=${st}/></g>`)}
+    ${room.hazard && html`<rect width="1000" height="300" fill=${{ fire: "rgba(255,120,40,.18)", water: "rgba(40,90,140,.3)", gas: "rgba(120,180,60,.22)", collapse: "rgba(120,100,80,.25)", ice: "rgba(200,230,255,.3)" }[room.hazard] || "none"}/>`}
+    ${(dark || dim) && html`<rect width="1000" height="300" fill=${dark ? "rgba(5,3,8,.5)" : "rgba(5,3,8,.25)"}/>`}
+    <path d="M500,10 V290" stroke="#fff" strokeOpacity=".12" strokeWidth="2" strokeDasharray="6 10"/>
+    <rect width="1000" height="300" fill="url(#bt-vig)"/>
+  </svg>`;
+}
 const COND_GLYPH = { raging: "🔥", blessed: "✦", poisoned: "☠", prone: "⤓", frightened: "!", stunned: "★", restrained: "⛓", paralyzed: "⛓", invisible: "◌", dodging: "↺", hasted: "»", slowed: "«", blinded: "◐", charmed: "♥", hidden: "◌", asleep: "z", grappled: "✊", burning: "🔥", shielded: "⛨", hexed: "✶", marked: "◎", inspired: "♪" };
 function hpRing(frac, size, color){ const r = size / 2 - 2, L = 2 * Math.PI * r; return html`<svg className="bt-ring" width=${size} height=${size} viewBox=${`0 0 ${size} ${size}`} aria-hidden="true"><circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="4"/><circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" stroke=${color} strokeWidth="4" strokeDasharray=${`${Math.max(0, frac) * L} ${L}`} strokeLinecap="round" transform=${`rotate(-90 ${size / 2} ${size / 2})`}/></svg>`; }
 function Battlefield({ c, cm, sel, ally, cur, myTurn, onFoe, onAlly }){
@@ -84,7 +100,8 @@ function Battlefield({ c, cm, sel, ally, cur, myTurn, onFoe, onAlly }){
   if (hidden) return html`<div className="bt-collapsed"><button className="btn sm ghost" onClick=${() => { setHidden(false); store.set({ settings: { ...S().settings, battleMap: true } }); }}>🗺 Show battle map</button></div>`;
   const label = (x) => x.kind === "pc" ? firstName(cbChar(c, x)?.name || x.name) : x.name.replace(/\s*\(ritualist\)/, "");
   return html`<div className=${"battlefield scene-" + battleScene(cm.terrain)} role="group" aria-label="Battle map">
-    <${SceneArt} kind=${battleScene(cm.terrain)}/>
+    ${cm.room && cm.room.objects ? html`<${RoomScene} room=${cm.room}/>` : html`<${SceneArt} kind=${battleScene(cm.terrain)}/>`}
+    ${cm.room && (cm.room.cover || cm.room.choke || cm.room.high || cm.room.escape || cm.room.hazard) ? html`<div className="bt-room">${[cm.room.cover && "cover", cm.room.choke && "chokepoint", cm.room.high && "high ground", cm.room.escape && "escape route", cm.room.hazard && `hazard: ${cm.room.hazard}`].filter(Boolean).join(" · ")}</div>` : null}
     <div className="bt-lbl" style=${{ left: "13%" }}>Back</div><div className="bt-lbl" style=${{ left: "33%" }}>Front</div><div className="bt-lbl" style=${{ left: "67%" }}>Front</div><div className="bt-lbl" style=${{ left: "87%" }}>Back</div>
     <div className="bt-side" style=${{ left: "4%" }}>Your party</div><div className="bt-side right" style=${{ right: "4%" }}>Enemies</div>
     ${place.map(({ x, left, top }) => {
@@ -118,7 +135,8 @@ function Battlefield({ c, cm, sel, ally, cur, myTurn, onFoe, onAlly }){
 // ---------- first-time coach tips ----------
 function coachFor(tab, c){
   if (tab === "combat") return html`<${CoachTip} id="combat">Your party stands on the left, enemies on the right. <b>Melee attacks must get past the enemy's front line</b> (🛡 marks foes you can only hit with ranged attacks or spells). Tap an enemy to target it, then pick an action below. Hiding behind your own front line protects you too.<//>`;
-  if (tab === "map") return c?.explore ? html`<${CoachTip} id="dungeon">You're inside a dungeon. Tap a connected room to move there. Rooms can hold fights, traps, treasure or mysteries; the boss waits at the end. You can leave from any safe room.<//>` : html`<${CoachTip} id="map">Tap a place to see what's there, then <b>Travel</b>. Roads are safer and faster. Places marked with skulls are dangerous: check your level first.<//>`;
+  if (tab === "map" && !c?.explore && townOf(c)) return html`<${CoachTip} id="town">This is the town. <b>Tap a building to see what it is, then walk inside</b> to see its rooms and the people in it. Taverns, shops and temples have their services inside; back alleys and cellars hide ways down.<//>`;
+  if (tab === "map") return c?.explore ? (dungeonOf(c)?.hostile === false ? html`<${CoachTip} id="site">You're inside a place with a floor plan. <b>Tap a glowing room to walk there</b>, and tap furniture or people in your room to examine, search, open, read or talk. Private rooms are off limits unless you sneak. Searching finds hidden doors and stashes.<//>` : html`<${CoachTip} id="dungeon">You're inside a dungeon. Tap a connected room to move there. Rooms can hold fights, traps, treasure or mysteries; the boss waits at the end. Furniture gives cover in a fight, doorways are chokepoints, and some rooms are hazardous. You can leave from any safe room.<//>`) : html`<${CoachTip} id="map">Tap a place to see what's there, then <b>Travel</b>. Roads are safer and faster. Places marked with skulls are dangerous: check your level first.<//>`;
   if (tab === "party") return html`<${CoachTip} id="party">Set each companion's role and tactics, and who stands in the front or back line. Companions have opinions: their approval changes with your choices.<//>`;
   if (tab === "adventure") return html`<${CoachTip} id="adventure">This is your story. <b>Type anything you want to do</b> ("I sneak past the guard", "I ask the innkeeper about the abbey") or tap a suggestion. The Dungeon Master answers and asks for dice rolls when the outcome is uncertain.<//>`;
   return null;
